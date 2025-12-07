@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "src/ai/flows/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "build": {
+    "env": {
+      "GENKIT_ENV": "production"
+    }
+  },
+  "content": [
+    "src/ai/flows/**/*.ts"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "placeholderImages": [
+    {
+      "id": "puzzle",
+      "description": "A colorful puzzle.",
+      "imageUrl": "https://images.unsplash.com/photo-1611517976630-163467322778?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwdXp6bGUlMjBwaWVjZXN8ZW58MHx8fHwxNzY0NDkwODMwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "puzzle pieces"
+    },
+    {
+      "id": "tetris",
+      "description": "Falling tetris blocks.",
+      "imageUrl": "https://images.unsplash.com/photo-1686124943102-2e915da44e2f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx0ZXRyaXMlMjBibG9ja3N8ZW58MHx8fHwxNzY0NTYxOTIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tetris blocks"
+    },
+    {
+      "id": "flippy-bird",
+      "description": "A bird flying through pipes.",
+      "imageUrl": "https://images.unsplash.com/photo-1448227922836-6d05b3f8b663?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxiaXJkJTIwZmx5fGVufDB8fHx8MTc2NDU2MTkyMHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bird fly"
+    },
+    {
+      "id": "memory",
+      "description": "Brain illustration for a memory game.",
+      "imageUrl": "https://images.unsplash.com/photo-1763833294739-574b366c55ec?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtZW1vcnklMjBicmFpbnxlbnwwfHx8fDE3NjQ1NjE5MTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "memory brain"
+    },
+    {
+      "id": "snake",
+      "description": "A classic snake game screen.",
+      "imageUrl": "https://images.unsplash.com/photo-1757529151207-d2a8aaada154?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzbmFrZSUyMGdhbWV8ZW58MHx8fHwxNzY0NTYxOTIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "snake game"
+    },
+    {
+      "id": "quiz",
+      "description": "A question mark for a quiz game.",
+      "imageUrl": "https://images.unsplash.com/photo-1548930046-00e0ab59893e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxxdWl6JTIwa25vd2xlZGdlfGVufDB8fHx8MTc2NDU2MTkyMHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "quiz knowledge"
+    }
+  ]
+}
