@@ -8,8 +8,5 @@
     "env": {
       "GENKIT_ENV": "production"
     }
-  },
-  "content": [
-    "src/ai/flows/**/*.ts"
-  ]
+  }
 }
