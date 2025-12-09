@@ -42,10 +42,14 @@ const nextConfig: NextConfig = {
   /* Optionnel : redirections / rewrites si besoin */
   async rewrites() {
     return [
-      // Exemple : rediriger /api/* vers les fonctions Next.js API routes
       {
-        source: '/api/:path*',
-        destination: '/api/:path*',
+        source: '/api/ai/:slug',
+        destination: '/api/genkit/flows/:slug',
+      },
+      // This rewrite is needed to make Genkit flows work with Vercel
+      {
+        source: '/api/genkit/:slug*',
+        destination: '/api/genkit/:slug*',
       },
     ];
   },
