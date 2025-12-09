@@ -17,7 +17,7 @@ const GAME_HEIGHT = 600;
 const GRAVITY = 0.4;
 const JUMP_STRENGTH = -7;
 const PIPE_WIDTH = 60;
-const PIPE_GAP = 220;
+const PIPE_GAP = 240;
 const PIPE_SPEED = 3;
 const PIPE_INTERVAL = 1500;
 
@@ -108,7 +108,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       // Generate new pipes
       if (time - lastPipeTime > PIPE_INTERVAL) {
         const minPipeHeight = 80;
-        const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 80;
+        const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 120; // Adjusted for more consistent gaps
         const topHeight = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
         newPipes.push({ x: GAME_WIDTH, topHeight: topHeight, scored: false });
         // This is a bit of a hack, but we need to update the lastPipeTime in the parent component
@@ -379,7 +379,7 @@ export function FlippyBirdGame() {
             {pipes.map((pipe, index) => (
                 <div key={index}>
                     <div
-                        className="absolute bg-green-600 border-2 border-black"
+                        className="absolute bg-green-600"
                         style={{
                             width: PIPE_WIDTH,
                             height: pipe.topHeight,
@@ -388,7 +388,7 @@ export function FlippyBirdGame() {
                         }}
                     />
                     <div
-                        className="absolute bg-green-600 border-2 border-black"
+                        className="absolute bg-green-600"
                         style={{
                             width: PIPE_WIDTH,
                             height: GAME_HEIGHT - pipe.topHeight - PIPE_GAP,
@@ -403,3 +403,5 @@ export function FlippyBirdGame() {
     </div>
   );
 }
+
+    
