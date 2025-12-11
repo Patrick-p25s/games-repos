@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Clear all data on first load for a fresh start
       if (typeof window !== 'undefined') {
-          localStorage.clear();
+          // localStorage.clear();
       }
 
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
@@ -288,24 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Remove the feedback item from the admin's view
     const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
     saveFeedback(updatedFeedback);
-
-    // Also remove the corresponding reply from the user's inbox
-    const updatedUsers = allUsers.map(u => {
-        if (u.id === feedbackToDelete.userId) {
-            const userCopy = { ...u };
-            userCopy.inbox = (userCopy.inbox || []).filter(
-                msg => msg.subject !== `Re: ${feedbackToDelete.subject}`
-            );
-            // If the currently logged-in user is the one being updated, update their state as well
-            if (user?.id === u.id) {
-                setUser(userCopy);
-            }
-            return userCopy;
-        }
-        return u;
-    });
-    saveAllUsers(updatedUsers);
-}, [allFeedback, allUsers, user, saveFeedback, saveAllUsers]);
+  }, [allFeedback, saveFeedback]);
 
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
     const newInboxMessage: InboxMessage = {
@@ -321,15 +304,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...u,
                 inbox: [newInboxMessage, ...(u.inbox || [])],
             };
-            if (user?.id === userId) {
-                setUser(updatedUser); 
-            }
             return updatedUser;
         }
         return u;
     });
 
     saveAllUsers(updatedUsers);
+
+    // If the person being replied to is the currently logged-in user,
+    // update their state directly so the change is reflected immediately.
+    if (user?.id === userId) {
+        setUser(prevUser => prevUser ? { ...prevUser, inbox: [newInboxMessage, ...(prevUser.inbox || [])] } : null);
+    }
   }, [allUsers, user, saveAllUsers]);
 
   const deleteMessage = useCallback((messageId: string) => {
@@ -380,5 +366,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
