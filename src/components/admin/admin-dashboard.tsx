@@ -282,7 +282,7 @@ export function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-center font-medium">{user.stats.overall.totalGames}</TableCell>
                         <TableCell className="text-center hidden sm:table-cell font-medium">{user.stats.overall.winRate}%</TableCell>
-                        <TableCell className="text-center hidden sm:table-cell font-medium">{user.stats.overall.totalPlaytime}</TableCell>
+                        <TableCell className="text-center hidden sm:table-cell font-medium">{formatTotalPlaytime(user.stats.overall.totalPlaytime)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

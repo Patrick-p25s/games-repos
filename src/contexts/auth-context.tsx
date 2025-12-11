@@ -37,8 +37,8 @@ export type User = {
       Tetris: GameStats & { linesCleared: number };
       Snake: GameStats & { applesEaten: number };
       "Flippy Bird": GameStats & { pipesPassed: number };
-      Memory: GameStats & { bestTime: number, score: number }; // en secondes
-      Puzzle: GameStats & { bestTime: number, score: number }; // en secondes
+      Memory: GameStats & { bestTime: number; score: number }; // en secondes
+      Puzzle: GameStats & { bestTime: number; score: number }; // en secondes
     }
   },
   inbox: InboxMessage[];
@@ -105,8 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Au montage initial, charge toutes les données depuis localStorage.
   useEffect(() => {
     try {
-      // localStorage.clear(); // Ligne pour réinitialiser les données lors du développement si nécessaire
-      
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
       if (storedAllUsers) {
         // Assure l'intégrité des données au chargement
@@ -130,7 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
 
       const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-      if (storedViewCount) setViewCount(JSON.parse(storedViewCount));
+      const sessionViewIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
+
+      let currentCount = storedViewCount ? JSON.parse(storedViewCount) : 0;
+      if (!sessionViewIncremented) {
+        currentCount++;
+        localStorage.setItem("nextgen-games-viewCount", JSON.stringify(currentCount));
+        sessionStorage.setItem("nextgen-games-view-incremented", "true");
+      }
+      setViewCount(currentCount);
       
     } catch (error) {
       console.error("Échec de l'analyse des données depuis localStorage", error);
@@ -282,9 +288,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Supprime un feedback.
   const deleteFeedback = useCallback((feedbackId: number) => {
-    const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
-    saveFeedback(updatedFeedback);
-  }, [allFeedback, saveFeedback]);
+    setAllFeedback(currentFeedback => {
+        const updatedFeedback = currentFeedback.filter(f => f.id !== feedbackId);
+        saveFeedback(updatedFeedback);
+        return updatedFeedback;
+    });
+  }, [saveFeedback]);
 
   // Envoie une réponse à un utilisateur et supprime le feedback original.
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
@@ -357,7 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth doit être utilisé à l'intérieur d'un AuthProvider");
+    throw new Error('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
   }
   return context;
 }
