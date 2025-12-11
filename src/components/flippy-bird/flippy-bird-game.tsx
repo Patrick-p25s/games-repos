@@ -1,3 +1,4 @@
+
 // Ce fichier contient le composant principal pour le jeu Flippy Bird.
 'use client';
 
@@ -17,11 +18,11 @@ const BIRD_SIZE = 30; // Taille de l'oiseau en pixels.
 const GAME_WIDTH = 400; // Largeur de la zone de jeu.
 const GAME_HEIGHT = 600; // Hauteur de la zone de jeu.
 const GRAVITY = 0.5; // Force de la gravité appliquée à l'oiseau.
-const JUMP_STRENGTH = -8; // Puissance du saut de l'oiseau.
+const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau, ajustée pour être moins forte.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
 const PIPE_GAP = 220; // Espace vertical entre les tuyaux.
 const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
-const PIPE_INTERVAL = 2500; // Temps en ms entre l'apparition de nouveaux tuyaux.
+const PIPE_INTERVAL = 3000; // Temps en ms entre l'apparition de nouveaux tuyaux.
 
 type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 
@@ -124,7 +125,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       });
       if(scoreIncremented) {
           // On ne peut pas appeler un autre dispatch ici, donc on met à jour directement le score.
-          // dispatch({ type: 'INCREMENT_SCORE' });
       }
 
       let newLastPipeTime = state.lastPipeTime;
@@ -159,9 +159,23 @@ export function FlippyBirdGame() {
   const { status, birdPosition, birdVelocity, pipes, score, startTime, highScore, newHighScore } = state;
   
   const [statsUpdated, setStatsUpdated] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [scoreJustIncreased, setScoreJustIncreased] = useState(false);
+
   const gameLoopRef = useRef<number>();
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'flippy-bird');
+  const prevScore = useRef(score);
+
+  useEffect(() => {
+    if (score > prevScore.current) {
+        setScoreJustIncreased(true);
+        const timer = setTimeout(() => setScoreJustIncreased(false), 200);
+        prevScore.current = score;
+        return () => clearTimeout(timer);
+    }
+  }, [score]);
+
 
   // Prépare le jeu pour une nouvelle partie.
   const readyGame = useCallback(() => {
@@ -184,11 +198,21 @@ export function FlippyBirdGame() {
     gameLoopRef.current = requestAnimationFrame(gameLoop);
   }, []);
 
+  // Déclenche un effet de flash à la fin de la partie
+  const triggerGameOver = useCallback(() => {
+      if (status !== 'over') {
+          setFlash(true);
+          setTimeout(() => setFlash(false), 200);
+          dispatch({ type: 'SET_GAME_OVER' });
+      }
+  }, [status]);
+
+
   // Vérifie les collisions avec le sol, le plafond et les tuyaux.
   const checkCollisions = useCallback(() => {
     // Collision avec les bords supérieur et inférieur.
     if (birdPosition < 0 || birdPosition > GAME_HEIGHT - BIRD_SIZE) {
-        dispatch({ type: 'SET_GAME_OVER' });
+        triggerGameOver();
         return;
     }
     
@@ -205,12 +229,12 @@ export function FlippyBirdGame() {
         const pipeBottomStart = pipe.topHeight + PIPE_GAP;
 
         if (birdTop < pipeTopEnd || birdBottom > pipeBottomStart) {
-            dispatch({ type: 'SET_GAME_OVER' });
+            triggerGameOver();
             return;
         }
       }
     }
-  }, [birdPosition, pipes]);
+  }, [birdPosition, pipes, triggerGameOver]);
 
   // Exécute la vérification des collisions à chaque mise à jour de la position.
   useEffect(() => {
@@ -361,11 +385,20 @@ export function FlippyBirdGame() {
                 backgroundImage: 'url(/img/flippy-bg.png)' 
             }}
         >
+            {flash && <div className="absolute inset-0 bg-white opacity-80 z-50 animate-ping" />}
+
             <div className="absolute inset-x-0 bottom-0 h-28 bg-cover bg-repeat-x" style={{backgroundImage: 'url(/img/flippy-ground.png)', animation: 'scroll-x 10s linear infinite'}} />
             
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white text-5xl font-bold z-20" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
+             <div
+                className={cn(
+                    "absolute top-4 left-1/2 -translate-x-1/2 text-white text-5xl font-bold z-20 transition-transform duration-200",
+                    scoreJustIncreased ? "scale-150" : "scale-100"
+                )}
+                style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+            >
                 {score}
             </div>
+
 
              {status === 'ready' && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
@@ -420,3 +453,5 @@ export function FlippyBirdGame() {
     </div>
   );
 }
+
+    
