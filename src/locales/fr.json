@@ -104,7 +104,7 @@
   "statsResetMessage": "Vos statistiques de jeu ont été effacées avec succès.",
   "quizTitle": "Quiz alimenté par l'IA",
   "quizSubtitle": "Testez vos connaissances avec des questions générées dynamiquement et adaptées à vous!",
-  "generatingQuiz": "Génération de votre quiz personnalisé...",
+  "generatingQuiz": "Mélange des Questions...",
   "letsTryQuiz": "Essayons un quiz!",
   "topic": "Sujet",
   "easy": "facile",
@@ -171,7 +171,7 @@
   "flippyBirdInstruction": "Cliquez sur l'écran ou appuyez sur la barre d'espace pour faire voler l'oiseau. Évitez les tuyaux !",
   "memoryInstruction": "Cliquez sur une carte pour la retourner. Trouvez toutes les paires pour gagner la partie.",
   "snakeInstruction": "Utilisez les touches fléchées ou ZQSD pour guider le serpent. Mangez la nourriture pour grandir. Évitez les murs et votre propre queue !",
-  "quizInstruction": "Notre IA analyse vos performances passées pour créer une expérience de quiz unique à chaque fois que vous jouez.",
+  "quizInstruction": "Testez vos connaissances contre notre vaste collection de questions. Un nouvel ensemble est mélangé pour vous à chaque fois !",
   "puzzleComplete": "Puzzle Résolu !",
   "congratulations": "Félicitations !",
   "youWonIn": "Vous avez gagné en",
@@ -202,3 +202,5 @@
   "totalViewsDescription": "Vues de page totales de l'application.",
   "emailInUse": "Cette adresse e-mail est déjà utilisée. Veuillez utiliser une autre adresse e-mail ou vous connecter."
 }
+
+    

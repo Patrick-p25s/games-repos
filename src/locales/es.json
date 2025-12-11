@@ -104,7 +104,7 @@
   "statsResetMessage": "Tus estadísticas de juego se han borrado correctamente.",
   "quizTitle": "Quiz con IA",
   "quizSubtitle": "¡Pon a prueba tus conocimientos con preguntas generadas dinámicamente y adaptadas a ti!",
-  "generatingQuiz": "Generando tu quiz personalizado...",
+  "generatingQuiz": "Mezclando Preguntas...",
   "letsTryQuiz": "¡Probemos un quiz!",
   "topic": "Tema",
   "easy": "fácil",
@@ -119,7 +119,7 @@
   "yourAnswers": "Tus respuestas",
   "yourAnswer": "Tu respuesta",
   "correctAnswer": "Respuesta correcta",
-"playAgain": "Jugar de nuevo",
+  "playAgain": "Jugar de nuevo",
   "question": "Pregunta",
   "of": "de",
   "nextQuestion": "Siguiente pregunta",
@@ -171,7 +171,7 @@
   "flippyBirdInstruction": "¡Haz clic en la pantalla o presiona la barra espaciadora para hacer volar al pájaro. ¡Evita las tuberías!",
   "memoryInstruction": "Haz clic en una carta para voltearla. Encuentra todos los pares para ganar el juego.",
   "snakeInstruction": "Usa las teclas de flecha o WASD para guiar a la serpiente. Come la comida para crecer. ¡Evita las paredes y tu propia cola!",
-  "quizInstruction": "Nuestra IA analiza tu rendimiento anterior para crear una experiencia de prueba única cada vez que juegas.",
+  "quizInstruction": "Pon a prueba tus conocimientos contra nuestra gran colección de preguntas. ¡Un nuevo conjunto se baraja para ti cada vez!",
   "puzzleComplete": "¡Puzzle Resuelto!",
   "congratulations": "¡Felicidades!",
   "youWonIn": "¡Ganaste en",
@@ -202,3 +202,5 @@
   "totalViewsDescription": "Vistas de página totales de la aplicación.",
   "emailInUse": "Esta dirección de correo electrónico ya está en uso. Por favor, utiliza un correo electrónico diferente o inicia sesión."
 }
+
+    

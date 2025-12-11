@@ -1,6 +1,6 @@
 
 "use client"
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 
 // Define the shape of statistics for each game.
 type GameStats = {
@@ -65,7 +65,7 @@ interface AuthContextType {
   viewCount: number;
   login: (email: string, name?: string) => void;
   logout: () => void;
-  updateUser: (newDetails: Partial<Omit<User, 'stats'>>) => void;
+  updateUser: (newDetails: Partial<Omit<User, 'stats' | 'id' | 'role'>>) => void;
   updateUserStats: (game: keyof User['stats']['games'], newStats: Partial<GameStats>) => void;
   resetStats: () => void;
   submitFeedback: (feedback: Omit<Feedback, 'id' | 'date' | 'userId'>) => void;
@@ -105,13 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
-      if (storedAllUsers) setAllUsers(JSON.parse(storedAllUsers));
+      if (storedAllUsers) {
+        // Ensure data integrity on load
+        const parsedUsers: User[] = JSON.parse(storedAllUsers);
+        parsedUsers.forEach(u => {
+          if (!u.inbox) u.inbox = [];
+          if (!u.stats) u.stats = JSON.parse(JSON.stringify(defaultStats));
+        });
+        setAllUsers(parsedUsers);
+      }
 
       const storedUser = localStorage.getItem("nextgen-games-user");
       if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
+        const parsedUser: User = JSON.parse(storedUser);
         // Ensure inbox exists to prevent errors on older data structures.
         if (!parsedUser.inbox) parsedUser.inbox = [];
+        if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
         setUser(parsedUser);
       }
 
@@ -129,40 +138,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Helper function to save all users to state and localStorage.
-  const saveAllUsers = (usersToSave: User[]) => {
+  const saveAllUsers = useCallback((usersToSave: User[]) => {
     localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersToSave));
     setAllUsers(usersToSave);
-  }
+  }, []);
 
   // Helper function to save the currently logged-in user.
-  const saveUser = (userToSave: User | null) => {
+  const saveUser = useCallback((userToSave: User | null) => {
     if (userToSave) {
         if (!userToSave.inbox) userToSave.inbox = [];
+        if (!userToSave.stats) userToSave.stats = JSON.parse(JSON.stringify(defaultStats));
         localStorage.setItem("nextgen-games-user", JSON.stringify(userToSave));
         
-        const existingUsers = [...allUsers];
-        const userIndex = existingUsers.findIndex(u => u.id === userToSave.id);
-        
-        if (userIndex > -1) {
-            existingUsers[userIndex] = userToSave;
-        } else {
-            existingUsers.push(userToSave);
-        }
-        saveAllUsers(existingUsers);
+        // Update the user's data within the allUsers array
+        setAllUsers(prevAllUsers => {
+            const existingUsers = [...prevAllUsers];
+            const userIndex = existingUsers.findIndex(u => u.id === userToSave.id);
+            if (userIndex > -1) {
+                existingUsers[userIndex] = userToSave;
+            } else {
+                existingUsers.push(userToSave);
+            }
+            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(existingUsers));
+            return existingUsers;
+        });
     } else {
         localStorage.removeItem("nextgen-games-user");
     }
     setUser(userToSave);
-  }
+  }, []);
 
   // Helper function to save feedback to state and localStorage.
-  const saveFeedback = (feedbackToSave: Feedback[]) => {
+  const saveFeedback = useCallback((feedbackToSave: Feedback[]) => {
       localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackToSave));
       setAllFeedback(feedbackToSave);
-  }
+  }, []);
 
   // Login function: finds an existing user or creates a new one.
-  const login = (email: string, name?: string) => {
+  const login = useCallback((email: string, name?: string) => {
     const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
     const userId = email.toLowerCase();
     
@@ -180,66 +193,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           inbox: [],
         };
     } else {
-        // Ensure older user data structures are updated.
+        // Ensure older user data structures are updated for consistency.
         if (!loggedInUser.inbox) loggedInUser.inbox = [];
         if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
-        if (!loggedInUser.stats.games.Quiz.totalCorrect) {
-          loggedInUser.stats.games.Quiz.totalCorrect = 0;
-          loggedInUser.stats.games.Quiz.totalQuestions = 0;
-        }
     }
     
     saveUser(loggedInUser);
-  };
+  }, [allUsers, saveUser]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     saveUser(null);
-  };
+  }, [saveUser]);
 
-  const updateUser = (newDetails: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...newDetails };
-      saveUser(updatedUser);
-    }
-  };
-  
-  const updateUserStats = (game: keyof User['stats']['games'], newStats: Partial<GameStats>) => {
-     if (user) {
-      const updatedUser = { ...user, stats: JSON.parse(JSON.stringify(user.stats)) as User['stats']}; // Deep copy
-      const gameStats = updatedUser.stats.games[game];
-      
-      updatedUser.stats.games[game] = { ...gameStats, ...newStats };
-
-      // Recalculate overall stats
-      updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
-      
-      const totalMinutes = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
-      
-      let favoriteGame = "N/A";
-      let maxPlaytime = -1;
-      Object.entries(updatedUser.stats.games).forEach(([gameName, stats]) => {
-          if (stats.totalPlaytime > maxPlaytime) {
-              maxPlaytime = stats.totalPlaytime;
-              favoriteGame = gameName;
-          }
-      });
-      updatedUser.stats.overall.favoriteGame = favoriteGame;
-
-      saveUser(updatedUser);
-    }
-  };
-  
-  const resetStats = () => {
-      if (user) {
-        const updatedUser = { ...user, stats: JSON.parse(JSON.stringify(defaultStats)) };
+  const updateUser = useCallback((newDetails: Partial<User>) => {
+    setUser(currentUser => {
+      if (currentUser) {
+        const updatedUser = { ...currentUser, ...newDetails };
         saveUser(updatedUser);
+        return updatedUser;
       }
-  };
+      return null;
+    });
+  }, [saveUser]);
   
-  const submitFeedback = (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
+  const updateUserStats = useCallback((game: keyof User['stats']['games'], newStats: Partial<GameStats>) => {
+     setUser(currentUser => {
+       if (currentUser) {
+        const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(currentUser.stats)) as User['stats']}; // Deep copy
+        const gameStats = updatedUser.stats.games[game];
+        
+        updatedUser.stats.games[game] = { ...gameStats, ...newStats };
+
+        // Recalculate overall stats
+        updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
+        
+        const totalMinutes = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
+        
+        let favoriteGame = "N/A";
+        let maxPlaytime = -1;
+        Object.entries(updatedUser.stats.games).forEach(([gameName, stats]) => {
+            if (stats.totalPlaytime > maxPlaytime) {
+                maxPlaytime = stats.totalPlaytime;
+                favoriteGame = gameName;
+            }
+        });
+        updatedUser.stats.overall.favoriteGame = favoriteGame;
+
+        saveUser(updatedUser);
+        return updatedUser;
+      }
+      return null;
+    });
+  }, [saveUser]);
+  
+  const resetStats = useCallback(() => {
+      setUser(currentUser => {
+        if (currentUser) {
+          const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(defaultStats)) };
+          saveUser(updatedUser);
+          return updatedUser;
+        }
+        return null;
+      });
+  }, [saveUser]);
+  
+  const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
     const newFeedback: Feedback = {
       ...feedbackData,
@@ -247,39 +268,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       date: new Date().toLocaleDateString('en-CA'),
       userId: user.id
     };
-    const updatedFeedback = [...allFeedback, newFeedback];
-    saveFeedback(updatedFeedback);
-  };
+    setAllFeedback(currentFeedback => {
+        const updatedFeedback = [...currentFeedback, newFeedback];
+        saveFeedback(updatedFeedback);
+        return updatedFeedback;
+    });
+  }, [user, saveFeedback]);
 
-  const deleteFeedback = (feedbackId: number) => {
-    const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
-    saveFeedback(updatedFeedback);
-  };
+  const deleteFeedback = useCallback((feedbackId: number) => {
+    setAllFeedback(currentFeedback => {
+        const updatedFeedback = currentFeedback.filter(f => f.id !== feedbackId);
+        saveFeedback(updatedFeedback);
+        return updatedFeedback;
+    });
+  }, [saveFeedback]);
 
-  const sendReply = (userId: string, subject: string, message: string) => {
-      const users = [...allUsers];
-      const userIndex = users.findIndex(u => u.id === userId);
-      if (userIndex > -1) {
-          const newInboxMessage: InboxMessage = {
-              id: `msg-${Date.now()}`,
-              subject: `Re: ${subject}`,
-              message,
-              date: new Date().toLocaleDateString('en-CA'),
-          };
-          if (!users[userIndex].inbox) {
-            users[userIndex].inbox = [];
+  const sendReply = useCallback((userId: string, subject: string, message: string) => {
+      setAllUsers(currentUsers => {
+          const users = [...currentUsers];
+          const userIndex = users.findIndex(u => u.id === userId);
+          if (userIndex > -1) {
+              const newInboxMessage: InboxMessage = {
+                  id: `msg-${Date.now()}`,
+                  subject: `Re: ${subject}`,
+                  message,
+                  date: new Date().toLocaleDateString('en-CA'),
+              };
+              // Ensure inbox array exists
+              if (!users[userIndex].inbox) {
+                users[userIndex].inbox = [];
+              }
+              users[userIndex].inbox.unshift(newInboxMessage); // Add to the beginning
+              
+              // If the admin is replying to themselves, update the current user state directly
+              if (user?.id === userId) {
+                  setUser(users[userIndex]);
+                  localStorage.setItem("nextgen-games-user", JSON.stringify(users[userIndex]));
+              }
+              localStorage.setItem("nextgen-games-allUsers", JSON.stringify(users));
           }
-          users[userIndex].inbox = [newInboxMessage, ...users[userIndex].inbox];
-          saveAllUsers(users);
+          return users;
+      });
+  }, [user]);
 
-          // If the admin is replying to themselves, update the current user state too.
-          if (user?.id === userId) {
-            setUser(users[userIndex]);
-          }
-      }
-  };
-
-  const incrementViewCount = () => {
+  const incrementViewCount = useCallback(() => {
     try {
       // Use a function to ensure we're updating from the latest state.
       setViewCount(currentCount => {
@@ -290,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to update view count in localStorage", error);
     }
-  };
+  }, []);
 
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
@@ -316,3 +348,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    

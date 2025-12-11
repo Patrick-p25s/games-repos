@@ -207,7 +207,7 @@ export function AdminDashboard() {
                     <Gamepad2 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{t(mostPopularGame.toLowerCase() || 'quiz')}</div>
+                    <div className="text-2xl font-bold">{t(mostPopularGame.toLowerCase().replace(' ', '') || 'quiz')}</div>
                     <p className="text-xs text-muted-foreground">{t('mostPopularGameDescription')}</p>
                 </CardContent>
             </Card>
@@ -243,7 +243,7 @@ export function AdminDashboard() {
                     <TableRow>
                       <TableHead>{t('user')}</TableHead>
                       <TableHead className="hidden md:table-cell">{t('role')}</TableHead>
-                      <TableHead className="text-center">{t('games')}</TableHead>
+                      <TableHead className="text-center">{t('gamesPlayed')}</TableHead>
                       <TableHead className="text-center hidden sm:table-cell">{t('winRate')}</TableHead>
                       <TableHead className="text-center hidden sm:table-cell">{t('playtime')}</TableHead>
                     </TableRow>
@@ -326,3 +326,5 @@ export function AdminDashboard() {
     </div>
   )
 }
+
+    

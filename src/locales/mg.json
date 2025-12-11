@@ -104,7 +104,7 @@
   "statsResetMessage": "Voafafa soa aman-tsara ny antontan'isan'ny lalaonao.",
   "quizTitle": "Quiz ampiasain'ny AI",
   "quizSubtitle": "Fitsapao ny fahalalanao amin'ny fanontaniana mipoitra tampoka namboarina ho anao manokana!",
-  "generatingQuiz": "Eo am-pamoronana ny quiz manokanao...",
+  "generatingQuiz": "Mampifangaro Fanontaniana...",
   "letsTryQuiz": "Andao andramana quiz!",
   "topic": "Lohahevitra",
   "easy": "mora",
@@ -171,7 +171,7 @@
   "flippyBirdInstruction": "Tsindrio ny efijery na tsindrio ny bara habakabaka mba hampanidina ny vorona. Halaviro ny fantsona!",
   "memoryInstruction": "Tsindrio ny karatra iray hamadihana azy. Tadiavo ny mpivady mitovy rehetra handresena amin'ny lalao.",
   "snakeInstruction": "Ampiasao ny zana-tsipìka na WASD hitarihana ny bibilava. Hano ny sakafo mba hitombo. Halaviro ny rindrina sy ny rambonao manokana!",
-  "quizInstruction": "Ny AI-nay dia mandinika ny zava-bitanao taloha mba hamoronana traikefa quiz manokana isaky ny milalao ianao.",
+  "quizInstruction": "Fitsapao ny fahalalanao amin'ny fanangonanay fanontaniana maro. Afangaro ho anao isaky ny milalao ny andiany vaovao!",
   "puzzleComplete": "Voavaha ny Puzzle!",
   "congratulations": "Arahabaina!",
   "youWonIn": "Nandresy ianao tamin'ny",
@@ -202,3 +202,5 @@
   "totalViewsDescription": "Fitambaran'ny fijerena pejy fampiharana.",
   "emailInUse": "Efa ampiasaina ity adiresy mailaka ity. Mampiasà mailaka hafa na midira."
 }
+
+    

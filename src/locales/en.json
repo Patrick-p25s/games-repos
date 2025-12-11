@@ -104,7 +104,7 @@
   "statsResetMessage": "Your game statistics have been successfully cleared.",
   "quizTitle": "AI-Powered Quiz",
   "quizSubtitle": "Test your knowledge with dynamically generated questions tailored just for you!",
-  "generatingQuiz": "Generating your personalized quiz...",
+  "generatingQuiz": "Shuffling Questions...",
   "letsTryQuiz": "Let's try a quiz!",
   "topic": "Topic",
   "easy": "easy",
@@ -171,7 +171,7 @@
   "flippyBirdInstruction": "Click the screen or press the spacebar to make the bird fly. Avoid the pipes!",
   "memoryInstruction": "Click a card to flip it. Find all the matching pairs to win the game.",
   "snakeInstruction": "Use Arrow Keys or WASD to guide the snake. Eat the food to grow. Avoid walls and your own tail!",
-  "quizInstruction": "Our AI analyzes your past performance to create a unique quiz experience every time you play.",
+  "quizInstruction": "Test your knowledge against our large collection of questions. A new set is shuffled for you every time!",
   "puzzleComplete": "Puzzle Solved!",
   "congratulations": "Congratulations!",
   "youWonIn": "You won in",
@@ -202,3 +202,5 @@
   "totalViewsDescription": "Total application page views.",
   "emailInUse": "This email address is already in use. Please use a different email or log in."
 }
+
+    
