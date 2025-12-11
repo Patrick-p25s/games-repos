@@ -118,9 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-      if (storedViewCount) {
-        setViewCount(JSON.parse(storedViewCount));
-      }
+      setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
+
     } catch (error) {
       console.error("Failed to parse data from localStorage", error);
       // Clear potentially corrupted storage
@@ -284,11 +283,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const incrementViewCount = () => {
-    setViewCount(currentCount => {
-        const newCount = currentCount + 1;
-        localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-        return newCount;
-    });
+    try {
+      const currentCount = localStorage.getItem("nextgen-games-viewCount");
+      const newCount = (currentCount ? JSON.parse(currentCount) : 0) + 1;
+      localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+      setViewCount(newCount);
+    } catch (error) {
+      console.error("Failed to update view count in localStorage", error);
+    }
   };
 
 
@@ -309,5 +311,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
