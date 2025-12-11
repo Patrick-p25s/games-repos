@@ -247,13 +247,16 @@ export function FlippyBirdGame() {
   
   // Met à jour les statistiques de l'utilisateur à la fin de la partie.
   useEffect(() => {
-    if (status === 'over' && !statsUpdatedRef.current && user) {
+    if (status === 'over' && !statsUpdatedRef.current) {
+      if (user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats("Flippy Bird", {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
+            pipesPassed: score
         });
-        statsUpdatedRef.current = true;
+      }
+      statsUpdatedRef.current = true;
     }
   }, [status, score, user, updateUserStats]);
 
