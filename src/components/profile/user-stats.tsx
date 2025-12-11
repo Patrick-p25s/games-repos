@@ -49,6 +49,9 @@ export function UserStats() {
         }
         return gameData[stat as keyof typeof gameData] || defaultValue;
     }
+    
+    // Convertit le temps de jeu total de secondes en une chaîne lisible.
+    const totalPlaytimeFormatted = formatPlaytime(stats.overall.totalPlaytime);
 
     // Configuration pour l'affichage des statistiques de chaque jeu.
     const gameStatsConfig = [
@@ -129,7 +132,7 @@ export function UserStats() {
                     </div>
                      <div className="p-4 bg-muted/50 rounded-lg">
                         <Clock className="h-8 w-8 mx-auto text-primary mb-2" />
-                        <p className="text-2xl font-bold">{stats.overall.totalPlaytime}</p>
+                        <p className="text-2xl font-bold">{totalPlaytimeFormatted}</p>
                         <p className="text-sm text-muted-foreground">{t('totalPlaytime')}</p>
                     </div>
                 </CardContent>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -85,7 +84,7 @@ export function TetrisGame() {
         updateUserStats('Tetris', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            totalPlaytime: playtimeInSeconds,
             linesCleared: linesCleared,
         });
         setStatsUpdated(true);
@@ -266,12 +265,10 @@ export function TetrisGame() {
         droppedPiece.pos.y += 1;
     }
     
+    // Annule la boucle de jeu pour éviter un double drop, met à jour la pièce et relance la boucle
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     setActivePiece(droppedPiece);
-
-    // Utilise un timeout pour s'assurer que la chute et le verrouillage s'exécutent après la mise à jour de l'état.
-    setTimeout(() => {
-      drop();
-    }, 0);
+    drop();
   };
 
   // Gère les entrées clavier.

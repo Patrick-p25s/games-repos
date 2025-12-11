@@ -1,4 +1,4 @@
-
+// La page d'accueil de l'application, présentant la liste des jeux disponibles.
 'use client';
 import {
   Card,
@@ -19,6 +19,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useLocale } from "@/contexts/locale-context";
 
+// Définit la structure d'un objet jeu.
 type Game = {
   name: string;
   href: string;
@@ -26,6 +27,7 @@ type Game = {
   description: string;
 };
 
+// Liste des jeux disponibles dans l'application.
 const games: Game[] = [
   { name: "Puzzle", href: "/puzzle/play", icon: Puzzle, description: "puzzleDescription" },
   { name: "Tetris", href: "/tetris/play", icon: Blocks, description: "tetrisDescription" },

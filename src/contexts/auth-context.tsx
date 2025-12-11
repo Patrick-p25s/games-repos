@@ -128,15 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
 
       const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-      const sessionViewIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
-
-      let currentCount = storedViewCount ? JSON.parse(storedViewCount) : 0;
-      if (!sessionViewIncremented) {
-        currentCount++;
-        localStorage.setItem("nextgen-games-viewCount", JSON.stringify(currentCount));
-        sessionStorage.setItem("nextgen-games-view-incremented", "true");
-      }
-      setViewCount(currentCount);
+      setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
       
     } catch (error) {
       console.error("Échec de l'analyse des données depuis localStorage", error);
@@ -230,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!currentUser) return null;
       
       const updatedUser = JSON.parse(JSON.stringify(currentUser)) as User;
-      const gameStats = updatedUser.stats.games[game];
 
       // Met à jour les statistiques spécifiques du jeu
       Object.assign(updatedUser.stats.games[game], newStats);
@@ -268,23 +259,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [saveUser]);
   
-  // Soumet un nouveau feedback.
+  // Soumet un nouveau feedback de manière atomique.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
-    const newFeedback: Feedback = {
-      ...feedbackData,
-      id: Date.now(),
-      date: new Date().toLocaleDateString('en-CA'),
-      userId: user.id
-    };
-    
-    // Utilise une fonction de mise à jour pour garantir l'atomicité et éviter les race conditions.
+
     setAllFeedback(currentFeedback => {
+        const newFeedback: Feedback = {
+            ...feedbackData,
+            id: Date.now(),
+            date: new Date().toLocaleDateString('en-CA'),
+            userId: user.id
+        };
         const updatedFeedback = [...currentFeedback, newFeedback];
         saveFeedback(updatedFeedback);
         return updatedFeedback;
     });
   }, [user, saveFeedback]);
+
 
   // Supprime un feedback.
   const deleteFeedback = useCallback((feedbackId: number) => {
@@ -295,7 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [saveFeedback]);
 
-  // Envoie une réponse à un utilisateur et supprime le feedback original.
+  // Envoie une réponse à un utilisateur et met à jour les données de manière atomique.
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
     const newInboxMessage: InboxMessage = {
         id: `msg-${Date.now()}`,
@@ -304,26 +295,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date: new Date().toLocaleDateString('en-CA'),
     };
     
-    // Met à jour la liste complète des utilisateurs
-    const updatedUsers = allUsers.map(u => {
-        if (u.id === userId) {
-            const updatedUserInbox = [newInboxMessage, ...(u.inbox || [])];
-            return { ...u, inbox: updatedUserInbox };
+    // Utilise la forme fonctionnelle de setState pour garantir une mise à jour atomique.
+    setAllUsers(currentUsers => {
+        const updatedUsers = currentUsers.map(u => {
+            if (u.id === userId) {
+                // S'assure que 'inbox' est un tableau avant d'y ajouter des éléments.
+                const newInbox = u.inbox ? [newInboxMessage, ...u.inbox] : [newInboxMessage];
+                return { ...u, inbox: newInbox };
+            }
+            return u;
+        });
+        
+        // Sauvegarde la liste complète des utilisateurs mise à jour.
+        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(updatedUsers));
+        
+        // Si l'utilisateur qui reçoit la réponse est celui qui est connecté,
+        // met à jour son état local pour un affichage immédiat.
+        if (user && user.id === userId) {
+            const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
+            if (updatedLoggedInUser) {
+                setUser(updatedLoggedInUser);
+                localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
+            }
         }
-        return u;
+        
+        return updatedUsers;
     });
-    saveAllUsers(updatedUsers);
-
-    // Si l'utilisateur qui reçoit la réponse est celui qui est connecté,
-    // on met à jour son état local pour un affichage immédiat.
-    if (user && user.id === userId) {
-        const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
-        if (updatedLoggedInUser) {
-           setUser(updatedLoggedInUser);
-           localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
-        }
-    }
-  }, [user, allUsers, saveAllUsers]);
+  }, [user]);
 
   // Supprime un message de la boîte de réception de l'utilisateur.
   const deleteMessage = useCallback((messageId: string) => {
@@ -332,17 +330,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveUser(updatedUser);
   }, [user, saveUser]);
 
-  // Incrémente le compteur de vues de l'application.
+  // Incrémente le compteur de vues de l'application une seule fois par session.
   const incrementViewCount = useCallback(() => {
-    setViewCount(currentCount => {
-        const newCount = currentCount + 1;
-        try {
-            localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-        } catch (error) {
-            console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
-        }
-        return newCount;
-    });
+    const hasIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
+    if (!hasIncremented) {
+        setViewCount(currentCount => {
+            const newCount = currentCount + 1;
+            try {
+                localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+                sessionStorage.setItem("nextgen-games-view-incremented", "true");
+            } catch (error) {
+                console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
+            }
+            return newCount;
+        });
+    }
   }, []);
 
   const isLoggedIn = !!user;

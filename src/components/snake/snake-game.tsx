@@ -92,6 +92,7 @@ export function SnakeGame() {
           setHighScore(score);
         }
         updateUserStats('Snake', {
+            gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
             totalPlaytime: playtimeInSeconds,
             applesEaten: (existingStats.applesEaten || 0) + applesEaten,
