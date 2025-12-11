@@ -77,7 +77,7 @@ export function MemoryGame() {
             updateUserStats('Memory', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + time,
+                totalPlaytime: time, // Pass playtime in seconds
                 bestTime: newBestTime,
             });
             setStatsUpdated(true);
@@ -231,8 +231,8 @@ export function MemoryGame() {
     )
   }
 
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
+  const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+  const seconds = (time % 60).toString().padStart(2, '0');
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -240,7 +240,7 @@ export function MemoryGame() {
             <h1 className="text-4xl font-bold font-headline">{t('memory')}</h1>
             <div className="flex gap-8 mt-2 text-lg">
                 <p>{t('moves')}: <span className="font-bold">{moves}</span></p>
-                <p>{t('time')}: <span className="font-bold">{minutes}:{seconds.toString().padStart(2, '0')}</span></p>
+                <p>{t('time')}: <span className="font-bold tabular-nums">{minutes}:{seconds}</span></p>
             </div>
         </div>
         <div 
@@ -275,5 +275,7 @@ export function MemoryGame() {
     </div>
   );
 }
+
+    
 
     

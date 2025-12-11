@@ -52,7 +52,7 @@ export function SnakeGame() {
             updateUserStats('Snake', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + time,
+                totalPlaytime: time, // Pass playtime in seconds
                 applesEaten: (existingStats.applesEaten || 0) + (score / 10),
             });
             setStatsUpdated(true);
@@ -265,8 +265,8 @@ export function SnakeGame() {
     )
   }
 
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
+  const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+  const seconds = (time % 60).toString().padStart(2, '0');
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -274,7 +274,7 @@ export function SnakeGame() {
             <h1 className="text-4xl font-bold font-headline">{t('snake')}</h1>
             <div className="flex gap-8 text-2xl mt-2">
                 <p>{t('score')}: {score}</p>
-                <p>{t('time')}: {minutes}:{seconds.toString().padStart(2, '0')}</p>
+                <p>{t('time')}: <span className="font-mono">{minutes}:{seconds}</span></p>
             </div>
         </div>
         <div 
@@ -317,5 +317,7 @@ export function SnakeGame() {
     </div>
   );
 }
+
+    
 
     

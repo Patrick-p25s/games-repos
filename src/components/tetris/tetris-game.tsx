@@ -77,7 +77,7 @@ export function TetrisGame() {
             updateUserStats('Tetris', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + time,
+                totalPlaytime: time, // Pass playtime in seconds
                 linesCleared: existingStats.linesCleared + linesCleared,
             });
             setStatsUpdated(true);
@@ -341,8 +341,8 @@ export function TetrisGame() {
     )
   }
   
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
+  const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+  const seconds = (time % 60).toString().padStart(2, '0');
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 py-8 bg-background text-foreground">
@@ -351,7 +351,7 @@ export function TetrisGame() {
             <div className="grid grid-cols-4 gap-2 p-2 mb-4 rounded-lg bg-muted text-foreground">
                 <div className="text-center">
                     <p className="text-sm text-muted-foreground">{t('time')}</p>
-                    <p className="font-bold text-lg">{minutes}:{seconds.toString().padStart(2, '0')}</p>
+                    <p className="font-bold text-lg tabular-nums">{minutes}:{seconds}</p>
                 </div>
                 <div className="text-center">
                     <p className="text-sm text-muted-foreground">{t('score')}</p>
@@ -407,5 +407,7 @@ export function TetrisGame() {
     </div>
   );
 }
+
+    
 
     

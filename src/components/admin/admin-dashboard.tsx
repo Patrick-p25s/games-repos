@@ -139,17 +139,22 @@ export function AdminDashboard() {
   const { toast } = useToast();
   const { allUsers, allFeedback, deleteFeedback, viewCount } = useAuth();
   
-  const totalPlaytimeMinutes = allUsers.reduce((total, user) => {
-      const timeString = user.stats.overall.totalPlaytime;
-      const parts = timeString.match(/(\d+)h\s*(\d+)m/);
-      if (parts) {
-          return total + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-      }
-      return total;
+  const totalPlaytimeSeconds = allUsers.reduce((total, user) => {
+    const userTotalSeconds = Object.values(user.stats.games).reduce((acc, game) => acc + game.totalPlaytime, 0);
+    return total + userTotalSeconds;
   }, 0);
-  const totalPlaytimeHours = Math.floor(totalPlaytimeMinutes / 60);
-  const remainingMinutes = totalPlaytimeMinutes % 60;
-  const totalPlaytimeDisplay = `${totalPlaytimeHours}h ${remainingMinutes}m`;
+  
+  const formatTotalPlaytime = (seconds: number): string => {
+    if (seconds === 0) return '0m';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) {
+      return `${h}h ${m}m`;
+    }
+    return `${m}m`;
+  };
+
+  const totalPlaytimeDisplay = formatTotalPlaytime(totalPlaytimeSeconds);
   
   const gameCounts = allUsers.reduce((acc, user) => {
     const game = user.stats.overall.favoriteGame;
@@ -328,5 +333,7 @@ export function AdminDashboard() {
     </div>
   )
 }
+
+    
 
     

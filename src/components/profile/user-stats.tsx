@@ -34,7 +34,10 @@ export function UserStats() {
         if (seconds === 0) return '0m';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        return `${h > 0 ? `${h}h ` : ''}${m}m`;
+        if (h > 0) {
+            return `${h}h ${m}m`;
+        }
+        return `${m}m`;
     }
 
     const getSafeStat = (game: string, stat: string, defaultValue: string | number = 0) => {
@@ -183,5 +186,7 @@ export function UserStats() {
         </div>
     );
 }
+
+    
 
     
