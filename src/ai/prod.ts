@@ -1,5 +1,2 @@
-import { config } from 'dotenv';
-config({ path: '.env.local' });
-
 import '@/ai/flows/tailor-quiz-difficulty.ts';
 import '@/ai/flows/generate-quiz-questions.ts';
