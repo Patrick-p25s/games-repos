@@ -114,6 +114,7 @@ export function QuizClient() {
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score } = state;
   const startTimeRef = useRef<number>(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
   
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
   const { toast } = useToast();
@@ -121,6 +122,7 @@ export function QuizClient() {
   // This function now loads questions from the static data file based on language.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
+    setStatsUpdated(false);
     startTimeRef.current = Date.now();
 
     // Simulate a brief loading period for a better user experience.
@@ -152,7 +154,7 @@ export function QuizClient() {
   
   // This effect runs once when the game is finished to update the user's stats.
   useEffect(() => {
-    if (status === 'finished' && user && questions.length > 0) {
+    if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
         const playtimeInSeconds = startTimeRef.current > 0 ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
         const existingStats = user.stats.games.Quiz;
         const newTotalCorrect = (existingStats.totalCorrect || 0) + score;
@@ -166,9 +168,10 @@ export function QuizClient() {
             totalCorrect: newTotalCorrect,
             totalQuestions: newTotalQuestions,
         });
+        setStatsUpdated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, user, questions, score, statsUpdated]);
 
   // Render the lobby screen.
   if (status === "lobby") {

@@ -40,6 +40,7 @@ export function SnakeGame() {
   const gameLoopRef = useRef<NodeJS.Timeout>();
   const timerRef = useRef<NodeJS.Timeout>();
   const startTimeRef = useRef<number>(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
 
   const gameImage = PlaceHolderImages.find(img => img.id === 'snake');
 
@@ -65,6 +66,7 @@ export function SnakeGame() {
     setScore(0);
     setApplesEaten(0);
     setTime(0);
+    setStatsUpdated(false);
   }, [createFood]);
 
   // Démarre une nouvelle partie
@@ -84,17 +86,16 @@ export function SnakeGame() {
 
   // Met à jour les statistiques de l'utilisateur lorsque la partie est terminée
   useEffect(() => {
-    if (gameState === 'over' && user && startTimeRef.current > 0) {
+    if (gameState === 'over' && user && !statsUpdated) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Snake', {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
             applesEaten: applesEaten,
         });
-        startTimeRef.current = 0;
+        setStatsUpdated(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, user, score, applesEaten, updateUserStats, statsUpdated]);
 
 
   // Charge le meilleur score de l'utilisateur au montage

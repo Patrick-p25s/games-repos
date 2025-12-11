@@ -74,6 +74,7 @@ const createGrid = (): {grid: Grid, emptyPos: Position} => {
 };
 
 const isSolved = (grid: Grid): boolean => {
+    if (!grid || grid.length === 0) return false;
     const flatGrid = grid.flat();
     for (let i = 0; i < flatGrid.length - 1; i++) {
         if (flatGrid[i] !== i + 1) return false;
@@ -95,6 +96,7 @@ export function PuzzleGame() {
   const timerRef = useRef<NodeJS.Timeout>();
   const gameImage = useMemo(() => PlaceHolderImages.find(img => img.id === 'puzzle'), []);
   const startTimeRef = useRef<number>(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
 
 
   const endGame = useCallback((won: boolean) => {
@@ -107,7 +109,7 @@ export function PuzzleGame() {
   }, [moves]);
 
   useEffect(() => {
-    if (gameState === 'over' && user) {
+    if (gameState === 'over' && user && !statsUpdated) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Puzzle;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
@@ -117,9 +119,10 @@ export function PuzzleGame() {
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
+        setStatsUpdated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, user, score, isWon, statsUpdated]);
 
   useEffect(() => {
     const { grid: newGrid, emptyPos: newEmptyPos } = createGrid();
@@ -148,6 +151,7 @@ export function PuzzleGame() {
     setScore(0);
     setIsWon(false);
     setGameState('playing');
+    setStatsUpdated(false);
     startTimeRef.current = Date.now();
   }, []);
 
@@ -179,7 +183,7 @@ export function PuzzleGame() {
               <Image 
                 src={gameImage.imageUrl} 
                 alt={t('puzzle')} 
-                layout="fill" 
+                fill 
                 className="rounded-t-lg object-cover"
                 data-ai-hint={gameImage.imageHint}
               />

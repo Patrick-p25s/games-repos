@@ -49,6 +49,7 @@ export function MemoryGame() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'memory');
   const startTimeRef = useRef<number>(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
 
 
   const generateCards = useCallback(() => {
@@ -73,7 +74,7 @@ export function MemoryGame() {
   }, [moves]);
   
   useEffect(() => {
-    if (gameState === 'over' && user) {
+    if (gameState === 'over' && user && !statsUpdated) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Memory;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
@@ -83,9 +84,10 @@ export function MemoryGame() {
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
+        setStatsUpdated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, user, score, isWon, statsUpdated]);
 
   useEffect(() => {
     setCards(generateCards());
@@ -99,6 +101,7 @@ export function MemoryGame() {
     setScore(0);
     setIsWon(false);
     setGameState('playing');
+    setStatsUpdated(false);
     startTimeRef.current = Date.now();
   }, [generateCards]);
 
@@ -172,7 +175,7 @@ export function MemoryGame() {
               <Image 
                 src={gameImage.imageUrl} 
                 alt={t('memory')} 
-                layout="fill" 
+                fill
                 className="rounded-t-lg object-cover"
                 data-ai-hint={gameImage.imageHint}
               />

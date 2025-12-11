@@ -182,8 +182,8 @@ export function FlippyBirdGame() {
         return;
     }
     
-    const newVelocity = birdVelocity + GRAVITY;
-    const newPosition = birdPosition + newVelocity;
+    let newVelocity = birdVelocity + GRAVITY;
+    let newPosition = birdPosition + newVelocity;
 
     let newPipes = pipes.map(pipe => ({ ...pipe, x: pipe.x - PIPE_SPEED })).filter(pipe => pipe.x > -PIPE_WIDTH);
         

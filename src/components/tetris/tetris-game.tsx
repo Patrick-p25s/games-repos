@@ -52,6 +52,7 @@ export function TetrisGame() {
   const [time, setTime] = useState(0);
   const gameImage = PlaceHolderImages.find(img => img.id === 'tetris');
   const startTimeRef = useRef<number>(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
 
 
   const [activePiece, setActivePiece] = useState({
@@ -79,16 +80,16 @@ export function TetrisGame() {
 
   // Met à jour les statistiques du joueur à la fin de la partie.
   useEffect(() => {
-    if (gameState === 'over' && user) {
+    if (gameState === 'over' && user && !statsUpdated) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Tetris', {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
             linesCleared: linesCleared,
         });
+        setStatsUpdated(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, user, score, linesCleared, updateUserStats, statsUpdated]);
 
   // Réinitialise l'état du jeu pour une nouvelle partie.
   const resetGame = useCallback(() => {
@@ -103,6 +104,7 @@ export function TetrisGame() {
     setLevel(1);
     setLinesCleared(0);
     setTime(0);
+    setStatsUpdated(false);
   }, [randomTetromino]);
   
   useEffect(() => {
