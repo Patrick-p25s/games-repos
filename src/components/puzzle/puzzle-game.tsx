@@ -114,8 +114,7 @@ export function PuzzleGame() {
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
         
         updateUserStats('Puzzle', {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
+            highScore: score,
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
@@ -308,5 +307,3 @@ export function PuzzleGame() {
     </div>
   );
 }
-
-    

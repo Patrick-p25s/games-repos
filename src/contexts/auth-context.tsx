@@ -1,4 +1,3 @@
-
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -219,61 +218,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(currentUser => {
         if (!currentUser) return null;
 
+        // Create a deep copy to avoid mutation issues
         const updatedUser: User = JSON.parse(JSON.stringify(currentUser));
         
         const gameStats = updatedUser.stats.games[gameName];
         const overallStats = updatedUser.stats.overall;
 
-        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
-        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+        gameStats.gamesPlayed += 1;
+        gameStats.highScore = Math.max(gameStats.highScore, newGameStats.highScore || 0);
+        gameStats.totalPlaytime += newGameStats.totalPlaytime || 0;
 
+        // Handle specific game stats
         Object.keys(newGameStats).forEach(key => {
-            if (key !== 'highScore' && key !== 'totalPlaytime' && key !== 'gamesPlayed') {
+            if (!['highScore', 'totalPlaytime'].includes(key)) {
                 const statKey = key as keyof GameStats;
-                 if (typeof (gameStats as any)[statKey] === 'number') {
-                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                if (typeof (gameStats as any)[statKey] === 'number') {
+                    (gameStats as any)[statKey] += (newGameStats[statKey] || 0);
+                } else {
+                     (gameStats as any)[statKey] = newGameStats[statKey];
                 }
             }
         });
+        
         if (gameName === 'Quiz' && 'totalCorrect' in newGameStats && 'totalQuestions' in newGameStats) {
             const quizStats = gameStats as User['stats']['games']['Quiz'];
-            quizStats.totalCorrect = (quizStats.totalCorrect || 0);
-            quizStats.totalQuestions = (quizStats.totalQuestions || 0);
             quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
         }
 
+        // Determine if the game was a "win"
         let isWin = false;
         const score = newGameStats.highScore ?? 0;
         if (gameName === 'Quiz' && 'totalQuestions' in newGameStats) {
-            const totalQuestions = (newGameStats as any).totalQuestions ?? 0;
-            if (totalQuestions > 0) {
-              isWin = (score / totalQuestions) >= 0.5;
-            }
+             const totalQuestions = (newGameStats as any).totalQuestions ?? 0;
+             if(totalQuestions > 0) isWin = (score / totalQuestions) >= 0.5;
         } else if (score > 0) {
-            isWin = true;
+             isWin = true;
         }
-        
-        overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+
+        // Update overall stats
+        overallStats.totalGames += 1;
         if (isWin) {
-            overallStats.totalWins = (overallStats.totalWins || 0) + 1;
+            overallStats.totalWins += 1;
         }
-        
+
         overallStats.winRate = overallStats.totalGames > 0 
             ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100)
             : 0;
-
-        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
-
-        let favoriteGame = "N/A";
-        let maxPlaytime = -1;
-        for (const [game, data] of Object.entries(updatedUser.stats.games)) {
-            if (data.totalPlaytime > maxPlaytime) {
-                maxPlaytime = data.totalPlaytime;
-                favoriteGame = game;
-            }
-        }
-        overallStats.favoriteGame = favoriteGame;
+            
+        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+        
+        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => b.totalPlaytime - a.totalPlaytime)[0];
+        overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
 
         saveUser(updatedUser);
         return updatedUser;

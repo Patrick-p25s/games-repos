@@ -38,7 +38,6 @@ type QuizState = {
   selectedAnswer: number | null;
   userAnswers: (number | null)[];
   score: number;
-  statsUpdated: boolean;
 };
 
 // All state is reset here to ensure a clean start for every new game.
@@ -49,7 +48,6 @@ const initialState: QuizState = {
   selectedAnswer: null,
   userAnswers: [],
   score: 0,
-  statsUpdated: false,
 };
 
 type QuizAction =
@@ -58,7 +56,6 @@ type QuizAction =
   | { type: 'SELECT_ANSWER'; payload: { answerIndex: number } }
   | { type: 'NEXT_QUESTION' }
   | { type: 'FINISH_QUIZ' }
-  | { type: 'STATS_UPDATED' }
   | { type: 'RESTART' };
 
 function quizReducer(state: QuizState, action: QuizAction): QuizState {
@@ -98,8 +95,6 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
         userAnswers: newAnswers,
       };
     }
-    case 'STATS_UPDATED':
-      return { ...state, statsUpdated: true };
     case 'RESTART':
       return { ...initialState, status: 'lobby' };
     default:
@@ -116,7 +111,8 @@ export function QuizClient() {
   const { t, language } = useLocale();
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(quizReducer, initialState);
-  const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, statsUpdated } = state;
+  const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score } = state;
+  const [statsUpdated, setStatsUpdated] = useState(false);
   const startTimeRef = useRef<number>(0);
   
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
@@ -125,6 +121,7 @@ export function QuizClient() {
   // This function now loads questions from the static data file based on language.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
+    setStatsUpdated(false);
     startTimeRef.current = Date.now();
 
     // Simulate a brief loading period for a better user experience.
@@ -170,7 +167,7 @@ export function QuizClient() {
             totalCorrect: newTotalCorrect,
             totalQuestions: newTotalQuestions,
         });
-        dispatch({ type: 'STATS_UPDATED' });
+        setStatsUpdated(true);
     }
   }, [status, questions, score, statsUpdated, user, updateUserStats]);
 

@@ -69,7 +69,7 @@ export function MemoryGame() {
     setGameState('over');
     if (timerRef.current) clearInterval(timerRef.current);
     const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
-    const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - (finalTime * 5)) : 0;
+    const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - finalTime) : 0;
     setScore(calculatedScore);
   }, [moves]);
   
@@ -80,8 +80,7 @@ export function MemoryGame() {
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
         
         updateUserStats('Memory', {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
+            highScore: score,
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
@@ -281,5 +280,3 @@ export function MemoryGame() {
     </div>
   );
 }
-
-    
