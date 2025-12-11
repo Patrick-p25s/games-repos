@@ -17,7 +17,7 @@ const GAME_HEIGHT = 600;
 const GRAVITY = 0.4;
 const JUMP_STRENGTH = -7;
 const PIPE_WIDTH = 60;
-const PIPE_GAP = 240;
+const PIPE_GAP = 200;
 const PIPE_SPEED = 3;
 const PIPE_INTERVAL = 1500;
 
@@ -26,7 +26,6 @@ type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 type Pipe = {
   x: number;
   topHeight: number;
-  scored: boolean;
 };
 
 type GameState = {
@@ -35,15 +34,19 @@ type GameState = {
   birdVelocity: number;
   pipes: Pipe[];
   score: number;
-  startTime: number;
+  startTime: number | null;
+  lastPipeTime: number;
+  highScore: number;
+  newHighScore: boolean;
 };
 
 type GameAction =
-  | { type: 'START_GAME' }
-  | { type: 'READY_GAME' }
+  | { type: 'READY_GAME'; payload: { highScore: number } }
+  | { type: 'START_GAME'; }
   | { type: 'JUMP' }
-  | { type: 'GAME_TICK'; payload: { time: number; lastPipeTime: number } }
-  | { type: 'SET_GAME_OVER' };
+  | { type: 'GAME_TICK' }
+  | { type: 'SET_GAME_OVER' }
+  | { type: 'UPDATE_HIGH_SCORE' };
 
 
 const initialState: GameState = {
@@ -52,7 +55,10 @@ const initialState: GameState = {
   birdVelocity: 0,
   pipes: [],
   score: 0,
-  startTime: 0,
+  startTime: null,
+  lastPipeTime: 0,
+  highScore: 0,
+  newHighScore: false,
 };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -61,14 +67,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...initialState,
         status: 'ready',
-        startTime: 0,
+        highScore: action.payload.highScore,
       };
     case 'START_GAME':
+        if (state.status !== 'ready') return state;
       return {
         ...state,
         status: 'playing',
         birdVelocity: JUMP_STRENGTH,
         startTime: Date.now(),
+        lastPipeTime: Date.now(),
       };
     case 'JUMP':
       if (state.status !== 'playing') return state;
@@ -78,14 +86,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     case 'SET_GAME_OVER':
        if (state.status === 'over') return state;
+       const isNewHighScore = state.score > state.highScore;
        return {
         ...state,
         status: 'over',
-       }
+        newHighScore: isNewHighScore,
+        highScore: isNewHighScore ? state.score : state.highScore,
+       };
     case 'GAME_TICK': {
       if (state.status !== 'playing') return state;
-
-      const { time, lastPipeTime } = action.payload;
 
       // Bird physics
       const newVelocity = state.birdVelocity + GRAVITY;
@@ -97,23 +106,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         .filter(pipe => pipe.x > -PIPE_WIDTH);
 
       let updatedScore = state.score;
-
-      newPipes.forEach(pipe => {
-        if (!pipe.scored && pipe.x < GAME_WIDTH / 2 - BIRD_SIZE / 2) {
-          pipe.scored = true;
-          updatedScore += 1;
+      const birdX = GAME_WIDTH / 2;
+      
+      state.pipes.forEach(pipe => {
+        const pipeCenterX = pipe.x + PIPE_WIDTH / 2;
+        if (pipeCenterX > birdX - PIPE_SPEED && pipeCenterX <= birdX) {
+            updatedScore++;
         }
       });
       
-      // Generate new pipes
-      if (time - lastPipeTime > PIPE_INTERVAL) {
+      let newLastPipeTime = state.lastPipeTime;
+      if (Date.now() - state.lastPipeTime > PIPE_INTERVAL) {
         const minPipeHeight = 80;
-        const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 120; // Adjusted for more consistent gaps
+        const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 120;
         const topHeight = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
-        newPipes.push({ x: GAME_WIDTH, topHeight: topHeight, scored: false });
-        // This is a bit of a hack, but we need to update the lastPipeTime in the parent component
-        // A more complex solution would involve passing a callback, but this is simpler for now.
-        (window as any)._lastPipeTime = time;
+        newPipes.push({ x: GAME_WIDTH, topHeight: topHeight });
+        newLastPipeTime = Date.now();
       }
 
       return {
@@ -121,7 +129,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         birdVelocity: newVelocity,
         birdPosition: newPosition,
         pipes: newPipes,
-        score: updatedScore
+        score: updatedScore,
+        lastPipeTime: newLastPipeTime,
       };
     }
     default:
@@ -134,60 +143,38 @@ export function FlippyBirdGame() {
   const { t } = useLocale();
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(gameReducer, initialState);
-  const { status, birdPosition, birdVelocity, pipes, score, startTime } = state;
-
-  const [highScore, setHighScore] = useState(0);
-  const [newHighScore, setNewHighScore] = useState(false);
+  const { status, birdPosition, birdVelocity, pipes, score, startTime, highScore, newHighScore } = state;
+  
   const [statsUpdated, setStatsUpdated] = useState(false);
-
   const gameLoopRef = useRef<number>();
-  const lastPipeTimeRef = useRef(0);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'flippy-bird');
 
 
-  useEffect(() => {
-    if (user) {
-        setHighScore(user.stats.games["Flippy Bird"].highScore);
-    }
-  }, [user]);
-
   const readyGame = useCallback(() => {
-    setNewHighScore(false);
+    dispatch({ type: 'READY_GAME', payload: { highScore: user?.stats.games["Flippy Bird"].highScore || 0 } });
     setStatsUpdated(false);
-    lastPipeTimeRef.current = 0;
-    dispatch({ type: 'READY_GAME' });
-  }, []);
+  }, [user]);
   
   const handleUserAction = useCallback(() => {
     if (status === 'playing') {
       dispatch({ type: 'JUMP' });
     } else if (status === 'ready') {
-      lastPipeTimeRef.current = performance.now();
       dispatch({ type: 'START_GAME' });
     }
   }, [status]);
   
-  const gameLoop = useCallback((time: number) => {
-    dispatch({ type: 'GAME_TICK', payload: { time, lastPipeTime: lastPipeTimeRef.current } });
-    
-    // Update lastPipeTime based on the value set in the reducer hack
-    if ((window as any)._lastPipeTime) {
-      lastPipeTimeRef.current = (window as any)._lastPipeTime;
-      delete (window as any)._lastPipeTime;
-    }
-    
+  const gameLoop = useCallback(() => {
+    dispatch({ type: 'GAME_TICK' });
     gameLoopRef.current = requestAnimationFrame(gameLoop);
   }, []);
 
   const checkCollisions = useCallback(() => {
-    // Wall collision (top/bottom)
     if (birdPosition < 0 || birdPosition > GAME_HEIGHT - BIRD_SIZE) {
         dispatch({ type: 'SET_GAME_OVER' });
         return;
     }
     
-    // Pipe collision
     for (const pipe of pipes) {
       const birdRight = GAME_WIDTH / 2 + BIRD_SIZE / 2;
       const birdLeft = GAME_WIDTH / 2 - BIRD_SIZE / 2;
@@ -196,10 +183,10 @@ export function FlippyBirdGame() {
       if (birdRight > pipe.x && birdLeft < pipeRight) {
         const birdTop = birdPosition;
         const birdBottom = birdPosition + BIRD_SIZE;
-        const pipeTop = pipe.topHeight;
-        const pipeBottom = pipe.topHeight + PIPE_GAP;
+        const pipeTopEnd = pipe.topHeight;
+        const pipeBottomStart = pipe.topHeight + PIPE_GAP;
 
-        if (birdTop < pipeTop || birdBottom > pipeBottom) {
+        if (birdTop < pipeTopEnd || birdBottom > pipeBottomStart) {
             dispatch({ type: 'SET_GAME_OVER' });
             return;
         }
@@ -208,15 +195,15 @@ export function FlippyBirdGame() {
   }, [birdPosition, pipes]);
 
   useEffect(() => {
-      if (status === 'playing') {
-          checkCollisions();
-      }
+    if (status === 'playing') {
+        checkCollisions();
+    }
   }, [status, birdPosition, pipes, checkCollisions]);
   
   useEffect(() => {
     if (status === 'playing') {
       gameLoopRef.current = requestAnimationFrame(gameLoop);
-    } else if (status === 'over') {
+    } else {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     }
     
@@ -228,26 +215,19 @@ export function FlippyBirdGame() {
   }, [status, gameLoop]);
   
   useEffect(() => {
-    if(status === 'over' && !statsUpdated) {
-        if(user) {
-            const playtime = startTime > 0 ? Math.round((Date.now() - startTime) / 60000) : 0;
-            const existingStats = user.stats.games["Flippy Bird"];
-            
-            if (score > existingStats.highScore) {
-              setNewHighScore(true);
-              setHighScore(score);
-            }
-
-            updateUserStats("Flippy Bird", {
-                gamesPlayed: existingStats.gamesPlayed + 1,
-                highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + playtime,
-                pipesPassed: (existingStats.pipesPassed || 0) + score,
-            });
-            setStatsUpdated(true);
-        }
+    if(status === 'over' && !statsUpdated && user && startTime !== null) {
+        const playtime = Math.round((Date.now() - startTime) / 60000);
+        const existingStats = user.stats.games["Flippy Bird"];
+        
+        updateUserStats("Flippy Bird", {
+            gamesPlayed: existingStats.gamesPlayed + 1,
+            highScore: Math.max(existingStats.highScore, score),
+            totalPlaytime: existingStats.totalPlaytime + playtime,
+            pipesPassed: (existingStats.pipesPassed || 0) + score,
+        });
+        setStatsUpdated(true);
     }
-  }, [status, score, startTime, statsUpdated, user, updateUserStats]);
+  }, [status, score, startTime, user, updateUserStats, statsUpdated]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -259,7 +239,6 @@ export function FlippyBirdGame() {
     
     const gameArea = gameAreaRef.current;
     
-    // Attach listeners when the game is in 'ready' or 'playing' state
     if (status === 'ready' || status === 'playing') {
       gameArea?.addEventListener('click', handleUserAction);
       window.addEventListener('keydown', handleKeyPress);
@@ -290,7 +269,7 @@ export function FlippyBirdGame() {
               />
             </CardHeader>
           )}
-          <CardContent className="p-6">
+          <CardContent>
             <CardTitle className="text-3xl font-headline">{t('flippybird')}</CardTitle>
             <CardDescription className="text-lg mt-2 mb-6">{t('flippyBirdInstruction')}</CardDescription>
             <div className="flex flex-col gap-4">
@@ -316,11 +295,11 @@ export function FlippyBirdGame() {
         <div className="container flex flex-col items-center justify-center min-h-screen py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
-                    <CardTitle className="text-3xl font-bold text-red-500 font-headline">{t('gameOver')}</CardTitle>
+                    <CardTitle className="text-3xl font-bold text-destructive font-headline">{t('gameOver')}</CardTitle>
                     <CardDescription className="text-lg">{t('yourScore')}: <span className="font-bold">{score}</span></CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-md text-gray-600 dark:text-gray-400">{t('highScore')}: <span className="font-bold">{highScore}</span></p>
+                    <p className="text-md text-muted-foreground">{t('highScore')}: <span className="font-bold">{highScore}</span></p>
                     {newHighScore && (
                         <p className="mt-2 text-sm font-semibold text-primary">{t('newHighScoreMessage')}</p>
                     )}
@@ -379,7 +358,7 @@ export function FlippyBirdGame() {
             {pipes.map((pipe, index) => (
                 <div key={index}>
                     <div
-                        className="absolute bg-green-600"
+                        className="absolute bg-green-600 border-2 border-green-800 rounded-md"
                         style={{
                             width: PIPE_WIDTH,
                             height: pipe.topHeight,
@@ -388,7 +367,7 @@ export function FlippyBirdGame() {
                         }}
                     />
                     <div
-                        className="absolute bg-green-600"
+                        className="absolute bg-green-600 border-2 border-green-800 rounded-md"
                         style={{
                             width: PIPE_WIDTH,
                             height: GAME_HEIGHT - pipe.topHeight - PIPE_GAP,

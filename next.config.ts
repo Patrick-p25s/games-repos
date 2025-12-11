@@ -38,21 +38,16 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-
-  /* Optionnel : redirections / rewrites si besoin */
+  
   async rewrites() {
     return [
-      {
-        source: '/api/ai/:slug',
-        destination: '/api/genkit/flows/:slug',
-      },
-      // This rewrite is needed to make Genkit flows work with Vercel
       {
         source: '/api/genkit/:slug*',
         destination: '/api/genkit/:slug*',
       },
     ];
   },
+
 };
 
 export default nextConfig;
