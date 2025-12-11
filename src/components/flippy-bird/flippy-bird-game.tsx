@@ -17,11 +17,11 @@ const BIRD_SIZE = 30; // Taille de l'oiseau en pixels.
 const GAME_WIDTH = 400; // Largeur de la zone de jeu.
 const GAME_HEIGHT = 600; // Hauteur de la zone de jeu.
 const GRAVITY = 0.5; // Force de la gravité appliquée à l'oiseau.
-const JUMP_STRENGTH = -8; // Puissance du saut de l'oiseau.
+const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
-const PIPE_GAP = 180; // Espace vertical entre les tuyaux.
+const PIPE_GAP = 200; // Espace vertical entre les tuyaux.
 const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
-const PIPE_INTERVAL = 1800; // Temps en ms entre l'apparition de nouveaux tuyaux.
+const PIPE_INTERVAL = 2200; // Temps en ms entre l'apparition de nouveaux tuyaux.
 
 type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 
