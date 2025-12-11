@@ -1,4 +1,4 @@
-
+// Ce fichier affiche les statistiques de jeu détaillées pour l'utilisateur sur sa page de profil.
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@ export function UserStats() {
 
     const { stats } = user;
 
+    // Formate les secondes en une chaîne de caractères lisible (ex: "1h 23m" ou "45m").
     const formatPlaytime = (seconds: number): string => {
         if (seconds === 0) return '0m';
         const h = Math.floor(seconds / 3600);
@@ -40,6 +41,7 @@ export function UserStats() {
         return `${m}m`;
     }
 
+    // Récupère une statistique de jeu en toute sécurité, en retournant une valeur par défaut si elle n'existe pas.
     const getSafeStat = (game: string, stat: string, defaultValue: string | number = 0) => {
         const gameData = stats.games[game as keyof typeof stats.games];
         if (!gameData || !(stat in gameData)) {
@@ -48,6 +50,7 @@ export function UserStats() {
         return gameData[stat as keyof typeof gameData] || defaultValue;
     }
 
+    // Configuration pour l'affichage des statistiques de chaque jeu.
     const gameStatsConfig = [
         { name: "Quiz", stats: [
             { title: "gamesPlayed", value: getSafeStat("Quiz", "gamesPlayed") },
@@ -88,6 +91,7 @@ export function UserStats() {
     ];
 
 
+    // Gère la réinitialisation des statistiques de l'utilisateur.
     const handleResetStats = () => {
         resetStats();
         toast({
@@ -98,6 +102,7 @@ export function UserStats() {
 
     return (
         <div className="space-y-8">
+            {/* Carte des statistiques globales */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -130,6 +135,7 @@ export function UserStats() {
                 </CardContent>
             </Card>
 
+            {/* Carte des statistiques par jeu */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -155,6 +161,7 @@ export function UserStats() {
                 </CardContent>
             </Card>
 
+            {/* Zone de danger pour les actions irréversibles */}
             <Card>
                 <CardHeader>
                     <CardTitle>{t('dangerZone')}</CardTitle>
@@ -186,7 +193,3 @@ export function UserStats() {
         </div>
     );
 }
-
-    
-
-    

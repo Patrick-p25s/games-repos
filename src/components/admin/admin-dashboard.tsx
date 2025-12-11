@@ -1,4 +1,4 @@
-
+// Ce fichier contient le composant du tableau de bord de l'administrateur.
 "use client";
 
 import {
@@ -60,11 +60,12 @@ import * as z from "zod";
 import { useState } from "react";
 
 
+// Schéma de validation pour le formulaire de réponse.
 const replySchema = z.object({
-    message: z.string().min(10, { message: "Message must be at least 10 characters." }),
+    message: z.string().min(10, { message: "Le message doit contenir au moins 10 caractères." }),
 });
 
-
+// Composant pour la boîte de dialogue de réponse à un feedback.
 function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     const { t } = useLocale();
     const { sendReply, deleteFeedback } = useAuth();
@@ -78,16 +79,17 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
         },
     });
 
+    // Gère la soumission du formulaire de réponse.
     function onSubmit(values: z.infer<typeof replySchema>) {
         sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
-        // After replying, we can remove the feedback item from the admin's queue
+        // Après avoir répondu, nous supprimons l'élément de feedback de la file d'attente de l'admin.
         deleteFeedback(feedbackItem.id);
         toast({
           title: t('replySent'),
           description: t('replySentMessage', { name: feedbackItem.name }),
         });
         form.reset();
-        setOpen(false); // This line closes the dialog
+        setOpen(false); // Ferme la boîte de dialogue après l'envoi.
     }
 
     return (
@@ -134,16 +136,19 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     );
 }
 
+// Composant principal du tableau de bord de l'administrateur.
 export function AdminDashboard() {
   const { t } = useLocale();
   const { toast } = useToast();
   const { allUsers, allFeedback, deleteFeedback, viewCount } = useAuth();
   
+  // Calcule le temps de jeu total de tous les utilisateurs.
   const totalPlaytimeSeconds = allUsers.reduce((total, user) => {
     const userTotalSeconds = Object.values(user.stats.games).reduce((acc, game) => acc + game.totalPlaytime, 0);
     return total + userTotalSeconds;
   }, 0);
   
+  // Formate le temps de jeu total en une chaîne lisible (ex: "5h 30m").
   const formatTotalPlaytime = (seconds: number): string => {
     if (seconds === 0) return '0m';
     const h = Math.floor(seconds / 3600);
@@ -156,6 +161,7 @@ export function AdminDashboard() {
 
   const totalPlaytimeDisplay = formatTotalPlaytime(totalPlaytimeSeconds);
   
+  // Compte le jeu le plus populaire en se basant sur le jeu favori de chaque utilisateur.
   const gameCounts = allUsers.reduce((acc, user) => {
     const game = user.stats.overall.favoriteGame;
     if (game && game !== "N/A") {
@@ -166,7 +172,7 @@ export function AdminDashboard() {
 
   const mostPopularGame = Object.keys(gameCounts).reduce((a, b) => gameCounts[a] > gameCounts[b] ? a : b, 'N/A');
 
-
+  // Gère la suppression d'un feedback.
   const handleDeleteFeedback = (id: number) => {
     deleteFeedback(id);
     toast({
@@ -177,6 +183,7 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-8">
+        {/* Cartes de statistiques globales */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -333,7 +340,3 @@ export function AdminDashboard() {
     </div>
   )
 }
-
-    
-
-    

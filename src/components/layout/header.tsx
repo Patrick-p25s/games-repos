@@ -1,3 +1,4 @@
+// Ce fichier définit l'en-tête principal de l'application.
 import Link from "next/link";
 import { Gamepad2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -7,12 +8,16 @@ import { cn } from "@/lib/utils";
 
 export function Header() {
   return (
+    // L'en-tête est collant en haut de la page, avec un effet de flou pour une esthétique moderne.
     <header className={cn("sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60")}>
       <div className="container flex h-16 items-center">
+        {/* Logo et lien vers la page d'accueil */}
         <Link href="/" className="mr-8 flex items-center">
           <Gamepad2 className="h-6 w-6 text-primary" />
+          <span className="ml-2 hidden font-bold sm:inline-block">NextGen Games</span>
         </Link>
         <div className="flex flex-1 items-center justify-end space-x-2 md:space-x-4">
+          {/* Boutons d'action : changement de langue, thème et navigation utilisateur */}
           <LanguageSwitcher />
           <ThemeToggle />
           <UserNav />

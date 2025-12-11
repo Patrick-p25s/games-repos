@@ -1,16 +1,16 @@
-
+// Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 
-// Define the shape of statistics for each game.
+// Définit la structure des statistiques pour chaque jeu.
 type GameStats = {
   gamesPlayed: number;
   highScore: number;
-  totalPlaytime: number; // in seconds
-  [key: string]: number | string; // Allows for game-specific stats like 'linesCleared'
+  totalPlaytime: number; // en secondes
+  [key: string]: number | string; // Permet des statistiques spécifiques au jeu comme 'linesCleared'
 };
 
-// Define the shape for an inbox message.
+// Définit la structure d'un message dans la boîte de réception.
 export type InboxMessage = {
     id: string;
     subject: string;
@@ -18,7 +18,7 @@ export type InboxMessage = {
     date: string;
 };
 
-// Define the main User data structure.
+// Définit la structure principale des données de l'utilisateur.
 export type User = {
   id: string;
   name: string;
@@ -29,22 +29,22 @@ export type User = {
     overall: {
       totalGames: number;
       favoriteGame: string;
-      winRate: number; // Not currently implemented, but here for future use.
-      totalPlaytime: string; // e.g., '5h 30m'
+      winRate: number; // Pas implémenté actuellement, mais présent pour une utilisation future.
+      totalPlaytime: string; // ex: '5h 30m'
     },
     games: {
       Quiz: GameStats & { avgAccuracy: number, totalCorrect: number, totalQuestions: number };
       Tetris: GameStats & { linesCleared: number };
       Snake: GameStats & { applesEaten: number };
       "Flippy Bird": GameStats & { pipesPassed: number };
-      Memory: GameStats & { bestTime: number }; // in seconds
-      Puzzle: GameStats & { bestTime: number }; // in seconds
+      Memory: GameStats & { bestTime: number }; // en secondes
+      Puzzle: GameStats & { bestTime: number }; // en secondes
     }
   },
   inbox: InboxMessage[];
 }
 
-// Define the shape for a feedback submission.
+// Définit la structure d'une soumission de feedback.
 export type Feedback = {
   id: number;
   name: string;
@@ -55,7 +55,7 @@ export type Feedback = {
   userId: string;
 };
 
-// Define the context shape, including state and action functions.
+// Définit la forme du contexte, y compris l'état et les fonctions d'action.
 interface AuthContextType {
   isLoggedIn: boolean;
   user: User | null;
@@ -77,13 +77,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Define the default/initial stats for a new user.
+// Définit les statistiques par défaut pour un nouvel utilisateur.
 const defaultStats: User['stats'] = {
   overall: {
     totalGames: 0,
     favoriteGame: "N/A",
     winRate: 0,
-    totalPlaytime: "0h 0m",
+    totalPlaytime: "0m",
   },
   games: {
     Quiz: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, avgAccuracy: 0, totalCorrect: 0, totalQuestions: 0 },
@@ -95,19 +95,21 @@ const defaultStats: User['stats'] = {
   }
 };
 
-// The AuthProvider component wraps the application and provides the auth context.
+// Le composant AuthProvider enveloppe l'application et fournit le contexte d'authentification.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [viewCount, setViewCount] = useState(0);
 
-  // On initial mount, load all data from localStorage.
+  // Au montage initial, charge toutes les données depuis localStorage.
   useEffect(() => {
     try {
+      // localStorage.clear(); // Ligne pour réinitialiser les données lors du développement si nécessaire
+      
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
       if (storedAllUsers) {
-        // Ensure data integrity on load
+        // Assure l'intégrité des données au chargement
         const parsedUsers: User[] = JSON.parse(storedAllUsers);
         parsedUsers.forEach(u => {
           if (!u.inbox) u.inbox = [];
@@ -119,7 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem("nextgen-games-user");
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
-        // Ensure inbox exists to prevent errors on older data structures.
         if (!parsedUser.inbox) parsedUser.inbox = [];
         if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
         setUser(parsedUser);
@@ -130,21 +131,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
       if (storedViewCount) setViewCount(JSON.parse(storedViewCount));
-
+      
     } catch (error) {
-      console.error("Failed to parse data from localStorage", error);
-      // If storage is corrupted, clear it to start fresh.
+      console.error("Échec de l'analyse des données depuis localStorage", error);
+      // En cas d'erreur de lecture, on efface tout pour repartir sur une base saine.
       localStorage.clear();
     }
   }, []);
 
-  // Helper function to save all users to state and localStorage.
+  // Fonction utilitaire pour sauvegarder tous les utilisateurs dans l'état et localStorage.
   const saveAllUsers = useCallback((usersToSave: User[]) => {
     localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersToSave));
     setAllUsers(usersToSave);
   }, []);
 
-  // Helper function to save the currently logged-in user.
+  // Fonction utilitaire pour sauvegarder l'utilisateur actuellement connecté.
   const saveUser = useCallback((userToSave: User | null) => {
     if (userToSave) {
         if (!userToSave.inbox) userToSave.inbox = [];
@@ -168,13 +169,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userToSave);
   }, []);
 
-  // Helper function to save feedback to state and localStorage.
+  // Fonction utilitaire pour sauvegarder les feedbacks dans l'état et localStorage.
   const saveFeedback = useCallback((feedbackToSave: Feedback[]) => {
       localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackToSave));
       setAllFeedback(feedbackToSave);
   }, []);
 
-  // Login function: finds an existing user or creates a new one.
+  // Fonction de connexion : trouve un utilisateur existant ou en crée un nouveau.
   const login = useCallback((email: string, name?: string) => {
     const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
     const userId = email.toLowerCase();
@@ -182,18 +183,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let loggedInUser = allUsers.find(u => u.id === userId);
 
     if (!loggedInUser) {
-        // Create a new user if one doesn't exist.
         loggedInUser = {
           id: userId,
           name: name || (isAdminUser ? "Patrick Nomentsoa" : "Player One"),
           email: email,
           avatar: `https://picsum.photos/seed/${email}/96/96`,
           role: isAdminUser ? 'admin' : 'user',
-          stats: JSON.parse(JSON.stringify(defaultStats)), // Deep copy for safety
+          stats: JSON.parse(JSON.stringify(defaultStats)), // Copie profonde pour la sécurité
           inbox: [],
         };
     } else {
-        // Ensure older user data structures are updated for consistency.
+        // S'assure que les anciens utilisateurs ont les nouvelles structures de données
         if (!loggedInUser.inbox) loggedInUser.inbox = [];
         if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
     }
@@ -201,10 +201,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveUser(loggedInUser);
   }, [allUsers, saveUser]);
 
+  // Gère la déconnexion de l'utilisateur.
   const logout = useCallback(() => {
     saveUser(null);
   }, [saveUser]);
 
+  // Met à jour les informations de l'utilisateur.
   const updateUser = useCallback((newDetails: Partial<User>) => {
     setUser(currentUser => {
       if (currentUser) {
@@ -216,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [saveUser]);
   
+  // Met à jour les statistiques d'un jeu pour l'utilisateur.
   const updateUserStats = useCallback((game: keyof User['stats']['games'], newStats: Partial<GameStats>) => {
     setUser(currentUser => {
       if (!currentUser) return null;
@@ -223,26 +226,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = JSON.parse(JSON.stringify(currentUser)) as User;
       const gameStats = updatedUser.stats.games[game];
 
-      // Update the specific game's stats
-      updatedUser.stats.games[game] = { ...gameStats, ...newStats };
+      // Met à jour les statistiques spécifiques du jeu
+      Object.assign(updatedUser.stats.games[game], newStats);
       
-      // Always increment games played
-      updatedUser.stats.games[game].gamesPlayed = gameStats.gamesPlayed + 1;
-      
-      // Update total playtime for the specific game
-      updatedUser.stats.games[game].totalPlaytime = gameStats.totalPlaytime + (newStats.totalPlaytime || 0);
-
-      // Recalculate overall stats
+      // Recalcule les statistiques globales
       updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
       
       const totalSeconds = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
       const hours = Math.floor(totalSeconds / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
-      updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
+      updatedUser.stats.overall.totalPlaytime = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
       
+      // Recalcule le jeu favori en se basant sur le temps de jeu le plus élevé.
       let favoriteGame = "N/A";
       let maxPlaytime = -1;
-
       for (const [gameName, gameData] of Object.entries(updatedUser.stats.games)) {
           if (gameData.totalPlaytime > maxPlaytime) {
               maxPlaytime = gameData.totalPlaytime;
@@ -256,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [saveUser]);
   
+  // Réinitialise toutes les statistiques de l'utilisateur.
   const resetStats = useCallback(() => {
       setUser(currentUser => {
         if (currentUser) {
@@ -267,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [saveUser]);
   
+  // Soumet un nouveau feedback.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
     const newFeedback: Feedback = {
@@ -275,72 +274,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       date: new Date().toLocaleDateString('en-CA'),
       userId: user.id
     };
-    saveFeedback([...allFeedback, newFeedback]);
-  }, [user, allFeedback, saveFeedback]);
+    // Utilise une fonction de mise à jour pour éviter les problèmes de concurrence
+    setAllFeedback(currentFeedback => {
+        const updatedFeedback = [...currentFeedback, newFeedback];
+        saveFeedback(updatedFeedback);
+        return updatedFeedback;
+    });
+  }, [user, saveFeedback]);
 
+  // Supprime un feedback.
   const deleteFeedback = useCallback((feedbackId: number) => {
-    const feedbackToDelete = allFeedback.find(f => f.id === feedbackId);
-    if (!feedbackToDelete) return;
-
     const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
     saveFeedback(updatedFeedback);
   }, [allFeedback, saveFeedback]);
 
+  // Envoie une réponse à un utilisateur et supprime le feedback original.
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
-    setAllUsers(currentAllUsers => {
-        let userFound = false;
-        const updatedUsers = currentAllUsers.map(u => {
-            if (u.id === userId) {
-                userFound = true;
-                const newInboxMessage: InboxMessage = {
-                    id: `msg-${Date.now()}`,
-                    subject: `Re: ${subject}`,
-                    message,
-                    date: new Date().toLocaleDateString('en-CA'),
-                };
-                // Return a new user object with the new message
-                return {
-                    ...u,
-                    inbox: [newInboxMessage, ...(u.inbox || [])],
-                };
-            }
-            return u;
-        });
-
-        if (userFound) {
-            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(updatedUsers));
-
-            // If the currently logged-in user is the one receiving the message, update their state too
-            if (user && user.id === userId) {
-                const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
-                if (updatedLoggedInUser) {
-                    localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
-                    setUser(updatedLoggedInUser);
-                }
-            }
-        }
-        return updatedUsers;
-    });
-  }, [user]);
-
-  const deleteMessage = useCallback((messageId: string) => {
-    if (!user) return;
-    
-    const updatedUser = {
-      ...user,
-      inbox: user.inbox.filter(msg => msg.id !== messageId)
+    const newInboxMessage: InboxMessage = {
+        id: `msg-${Date.now()}`,
+        subject: `Re: ${subject}`,
+        message,
+        date: new Date().toLocaleDateString('en-CA'),
     };
     
+    // Met à jour la liste complète des utilisateurs
+    const updatedUsers = allUsers.map(u => {
+        if (u.id === userId) {
+            const updatedUser = { ...u };
+            updatedUser.inbox = [newInboxMessage, ...(updatedUser.inbox || [])];
+            return updatedUser;
+        }
+        return u;
+    });
+    saveAllUsers(updatedUsers);
+
+    // Si l'utilisateur qui reçoit la réponse est celui qui est connecté,
+    // on met à jour son état local pour un affichage immédiat.
+    if (user && user.id === userId) {
+        const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
+        if (updatedLoggedInUser) {
+           setUser(updatedLoggedInUser);
+           localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
+        }
+    }
+  }, [user, allUsers, saveAllUsers]);
+
+  // Supprime un message de la boîte de réception de l'utilisateur.
+  const deleteMessage = useCallback((messageId: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, inbox: user.inbox.filter(msg => msg.id !== messageId) };
     saveUser(updatedUser);
   }, [user, saveUser]);
 
+  // Incrémente le compteur de vues de l'application.
   const incrementViewCount = useCallback(() => {
     setViewCount(currentCount => {
         const newCount = currentCount + 1;
         try {
             localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
         } catch (error) {
-            console.error("Failed to update view count in localStorage", error);
+            console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
         }
         return newCount;
     });
@@ -349,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
+  // Rassemble toutes les valeurs à fournir au contexte.
   const contextValue = {
     isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, 
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
@@ -362,13 +356,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Custom hook to easily access the auth context.
+// Hook personnalisé pour accéder facilement au contexte d'authentification.
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
   }
   return context;
 }
-
-    
