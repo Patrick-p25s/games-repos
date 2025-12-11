@@ -84,6 +84,13 @@
   }
 }
 
+@layer utilities {
+    @keyframes scroll-x {
+        from { background-position: 0 0; }
+        to { background-position: -112px 0; }
+    }
+}
+
 @layer components {
   /* Applique une ombre moyenne aux cartes en mode clair pour une meilleure profondeur */
   .card {
