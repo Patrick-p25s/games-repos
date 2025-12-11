@@ -1,3 +1,4 @@
+// Ce fichier contient le composant principal du jeu Tetris.
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -80,10 +81,8 @@ export function TetrisGame() {
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-        const existingStats = user.stats.games.Tetris;
         updateUserStats('Tetris', {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
+            highScore: score,
             totalPlaytime: playtimeInSeconds,
             linesCleared: linesCleared,
         });
@@ -151,7 +150,7 @@ export function TetrisGame() {
                 if (value) {
                     const boardY = prev.pos.y + y;
                     const boardX = prev.pos.x + x;
-                    if(boardY < ROWS && boardX < COLS) {
+                    if(boardY < ROWS && boardX < COLS && boardY >= 0 && boardX >= 0) {
                         newBoard[boardY][boardX] = { filled: true, color: prev.tetromino.color };
                     }
                     if (boardY < 0) { // La pièce est verrouillée au-dessus du tableau.
@@ -169,20 +168,16 @@ export function TetrisGame() {
         // Vérifie et efface les lignes complétées.
         let clearedRowCount = 0;
         let tempBoard = [...newBoard];
-        let linesToClear = [];
-
         for (let y = tempBoard.length - 1; y >= 0; y--) {
             if (tempBoard[y].every(cell => cell.filled)) {
-                linesToClear.push(y);
+                tempBoard.splice(y, 1);
+                tempBoard.unshift(Array(COLS).fill({ filled: false, color: '' }));
                 clearedRowCount++;
+                y++; // Re-check the same row index since it's now a new row.
             }
         }
 
         if (clearedRowCount > 0) {
-            linesToClear.sort((a,b) => a - b).forEach(y => {
-                 tempBoard.splice(y, 1);
-                 tempBoard.unshift(Array(COLS).fill({ filled: false, color: '' }));
-            });
             setBoard(tempBoard);
             setScore(s => s + [0, 100, 300, 500, 800][clearedRowCount] * level);
             setLinesCleared(l => l + clearedRowCount);
@@ -260,14 +255,17 @@ export function TetrisGame() {
   // Fait tomber la pièce instantanément (hard drop).
   const hardDrop = () => {
     if (gameState !== 'playing') return;
-    let droppedPiece = { ...activePiece };
-    while (isValidMove(droppedPiece.shape, { ...droppedPiece.pos, y: droppedPiece.pos.y + 1}, board)) {
-        droppedPiece.pos.y += 1;
+
+    // Arrête la boucle de jeu temporairement pour éviter les conflits.
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+
+    let nextPiece = { ...activePiece };
+    while (isValidMove(nextPiece.shape, { ...nextPiece.pos, y: nextPiece.pos.y + 1}, board)) {
+        nextPiece.pos.y += 1;
     }
     
-    // Annule la boucle de jeu pour éviter un double drop, met à jour la pièce et relance la boucle
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    setActivePiece(droppedPiece);
+    // Met à jour la position, puis déclenche `drop` manuellement pour verrouiller la pièce et continuer.
+    setActivePiece(nextPiece);
     drop();
   };
 

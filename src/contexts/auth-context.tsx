@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -30,7 +31,7 @@ export type User = {
       totalGames: number;
       totalWins: number;
       favoriteGame: string;
-      winRate: number; // Pas implémenté actuellement, mais présent pour une utilisation future.
+      winRate: number;
       totalPlaytime: number; // Stocké en secondes pour la précision
     },
     games: {
@@ -67,7 +68,7 @@ interface AuthContextType {
   login: (email: string, name?: string) => void;
   logout: () => void;
   updateUser: (newDetails: Partial<Omit<User, 'stats' | 'id' | 'role'>>) => void;
-  updateUserStats: (game: keyof User['stats']['games'], newStats: Partial<GameStats>) => void;
+  updateUserStats: (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => void;
   resetStats: () => void;
   submitFeedback: (feedback: Omit<Feedback, 'id' | 'date' | 'userId'>) => void;
   deleteFeedback: (feedbackId: number) => void;
@@ -141,34 +142,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Fonction utilitaire pour sauvegarder tous les utilisateurs dans l'état et localStorage.
-  const saveAllUsers = useCallback((usersToSave: User[]) => {
-    localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersToSave));
-    setAllUsers(usersToSave);
-  }, []);
-
-  // Fonction utilitaire pour sauvegarder l'utilisateur actuellement connecté.
+  // Fonction utilitaire pour sauvegarder l'utilisateur actuellement connecté et la liste de tous les utilisateurs.
   const saveUser = useCallback((userToSave: User | null) => {
+    setUser(userToSave);
     if (userToSave) {
-        if (!userToSave.inbox) userToSave.inbox = [];
-        if (!userToSave.stats) userToSave.stats = JSON.parse(JSON.stringify(defaultStats));
         localStorage.setItem("nextgen-games-user", JSON.stringify(userToSave));
-        
         setAllUsers(prevAllUsers => {
-            const existingUsers = [...prevAllUsers];
-            const userIndex = existingUsers.findIndex(u => u.id === userToSave.id);
+            const userIndex = prevAllUsers.findIndex(u => u.id === userToSave.id);
+            const newAllUsers = [...prevAllUsers];
             if (userIndex > -1) {
-                existingUsers[userIndex] = userToSave;
+                newAllUsers[userIndex] = userToSave;
             } else {
-                existingUsers.push(userToSave);
+                newAllUsers.push(userToSave);
             }
-            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(existingUsers));
-            return existingUsers;
+            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(newAllUsers));
+            return newAllUsers;
         });
     } else {
         localStorage.removeItem("nextgen-games-user");
     }
-    setUser(userToSave);
   }, []);
 
   // Fonction utilitaire pour sauvegarder les feedbacks dans l'état et localStorage.
@@ -182,7 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
     const userId = email.toLowerCase();
     
-    let loggedInUser = allUsers.find(u => u.id === userId);
+    const existingUsers = JSON.parse(localStorage.getItem("nextgen-games-allUsers") || "[]") as User[];
+    let loggedInUser = existingUsers.find(u => u.id === userId);
 
     if (!loggedInUser) {
         loggedInUser = {
@@ -202,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     saveUser(loggedInUser);
-  }, [allUsers, saveUser]);
+  }, [saveUser]);
 
   // Gère la déconnexion de l'utilisateur.
   const logout = useCallback(() => {
@@ -222,66 +215,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveUser]);
   
   // Met à jour les statistiques d'un jeu pour l'utilisateur.
-  const updateUserStats = useCallback((gameName: keyof User['stats']['games'], gameStats: Partial<GameStats>) => {
-    setUser(currentUser => {
-        if (!currentUser) return null;
+  const updateUserStats = useCallback((gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
+      if (!user) return;
 
-        const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(currentUser.stats)) };
-        
-        // S'assurer que les structures existent
-        if (!updatedUser.stats.games[gameName]) {
-            updatedUser.stats.games[gameName] = JSON.parse(JSON.stringify(defaultStats.games[gameName]));
-        }
-        if (!updatedUser.stats.overall) {
-            updatedUser.stats.overall = JSON.parse(JSON.stringify(defaultStats.overall));
-        }
-         if (updatedUser.stats.overall.totalWins === undefined) {
-            updatedUser.stats.overall.totalWins = 0;
-        }
+      // 1. Crée une copie profonde de l'utilisateur actuel pour éviter les mutations directes.
+      const updatedUser: User = JSON.parse(JSON.stringify(user));
 
-        // Mettre à jour les stats spécifiques au jeu
-        Object.assign(updatedUser.stats.games[gameName], gameStats);
+      // 2. Récupère les statistiques existantes pour une lecture facile.
+      const gameStats = updatedUser.stats.games[gameName];
+      const overallStats = updatedUser.stats.overall;
 
-        // Déterminer si la partie est une victoire
-        let isWin = false;
-        const score = gameStats.highScore ?? 0;
-        const questions = (updatedUser.stats.games['Quiz'] as any).totalQuestions ?? 0;
-        
-        if (gameName === 'Quiz' && questions > 0) {
-            isWin = (score / questions) >= 0.5;
-        } else if (score > 0) {
-            isWin = true;
-        }
+      // 3. Met à jour les statistiques spécifiques au jeu.
+      Object.assign(gameStats, newGameStats);
+      gameStats.gamesPlayed += 1;
+      if (newGameStats.highScore) {
+          gameStats.highScore = Math.max(gameStats.highScore, newGameStats.highScore);
+      }
+      if (newGameStats.totalPlaytime) {
+          gameStats.totalPlaytime += newGameStats.totalPlaytime;
+      }
 
-        // Mettre à jour les stats globales
-        updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
-        if (isWin) {
-            updatedUser.stats.overall.totalWins += 1;
-        }
-        
-        if (updatedUser.stats.overall.totalGames > 0) {
-            updatedUser.stats.overall.winRate = Math.round((updatedUser.stats.overall.totalWins / updatedUser.stats.overall.totalGames) * 100);
-        } else {
-            updatedUser.stats.overall.winRate = 0;
-        }
-        
-        updatedUser.stats.overall.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+      // 4. Détermine si la partie est une "victoire".
+      let isWin = false;
+      const score = newGameStats.highScore ?? 0;
+      if (gameName === 'Quiz') {
+          const quizStats = gameStats as User['stats']['games']['Quiz'];
+          if (quizStats.totalQuestions > 0) {
+              isWin = (score / quizStats.totalQuestions) >= 0.5;
+          }
+      } else if (score > 0) {
+          isWin = true; // Pour les autres jeux, un score > 0 est une victoire.
+      }
+      
+      // 5. Met à jour les statistiques globales de manière fiable.
+      overallStats.totalGames += 1;
+      if (isWin) {
+          overallStats.totalWins += 1;
+      }
+      
+      // Calcule le nouveau taux de victoire.
+      overallStats.winRate = overallStats.totalGames > 0 
+          ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100)
+          : 0;
 
-        // Recalculer le jeu favori
-        let favoriteGame = "N/A";
-        let maxPlaytime = -1;
-        for (const [game, data] of Object.entries(updatedUser.stats.games)) {
-            if (data.totalPlaytime > maxPlaytime) {
-                maxPlaytime = data.totalPlaytime;
-                favoriteGame = game;
-            }
-        }
-        updatedUser.stats.overall.favoriteGame = favoriteGame;
+      // Calcule le nouveau temps de jeu total.
+      overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
 
-        saveUser(updatedUser);
-        return updatedUser;
-    });
-  }, [saveUser]);
+      // Recalcule le jeu favori.
+      let favoriteGame = "N/A";
+      let maxPlaytime = -1;
+      for (const [game, data] of Object.entries(updatedUser.stats.games)) {
+          if (data.totalPlaytime > maxPlaytime) {
+              maxPlaytime = data.totalPlaytime;
+              favoriteGame = game;
+          }
+      }
+      overallStats.favoriteGame = favoriteGame;
+
+      // 6. Sauvegarde l'objet utilisateur complet et mis à jour.
+      saveUser(updatedUser);
+
+  }, [user, saveUser]);
   
   // Réinitialise toutes les statistiques de l'utilisateur.
   const resetStats = useCallback(() => {
@@ -298,13 +292,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Soumet un nouveau feedback.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
+    const newFeedback: Feedback = {
+        ...feedbackData,
+        id: Date.now(),
+        date: new Date().toLocaleDateString('en-CA'),
+        userId: user.id
+    };
     setAllFeedback(currentFeedback => {
-        const newFeedback: Feedback = {
-            ...feedbackData,
-            id: Date.now(),
-            date: new Date().toLocaleDateString('en-CA'),
-            userId: user.id
-        };
         const updatedFeedback = [...currentFeedback, newFeedback];
         saveFeedback(updatedFeedback);
         return updatedFeedback;

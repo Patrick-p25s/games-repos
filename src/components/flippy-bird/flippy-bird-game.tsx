@@ -1,4 +1,4 @@
-
+// Ce fichier contient le composant principal pour le jeu Flippy Bird.
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
@@ -17,11 +17,11 @@ const BIRD_SIZE = 30; // Taille de l'oiseau en pixels.
 const GAME_WIDTH = 400; // Largeur de la zone de jeu.
 const GAME_HEIGHT = 600; // Hauteur de la zone de jeu.
 const GRAVITY = 0.5; // Force de la gravité appliquée à l'oiseau.
-const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau.
+const JUMP_STRENGTH = -8; // Puissance du saut de l'oiseau.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
-const PIPE_GAP = 200; // Espace vertical entre les tuyaux.
+const PIPE_GAP = 220; // Espace vertical entre les tuyaux.
 const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
-const PIPE_INTERVAL = 2200; // Temps en ms entre l'apparition de nouveaux tuyaux.
+const PIPE_INTERVAL = 2500; // Temps en ms entre l'apparition de nouveaux tuyaux.
 
 type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 
@@ -29,6 +29,7 @@ type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 type Pipe = {
   x: number; // Position horizontale.
   topHeight: number; // Hauteur du tuyau supérieur.
+  passed: boolean; // Si l'oiseau a déjà passé ce tuyau.
 };
 
 // État complet du jeu géré par le reducer.
@@ -51,7 +52,7 @@ type GameAction =
   | { type: 'JUMP' }
   | { type: 'GAME_TICK' }
   | { type: 'SET_GAME_OVER' }
-  | { type: 'UPDATE_HIGH_SCORE' };
+  | { type: 'INCREMENT_SCORE' };
 
 // État initial du jeu.
 const initialState: GameState = {
@@ -73,6 +74,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...initialState,
         status: 'ready',
+        birdPosition: GAME_HEIGHT / 2,
         highScore: action.payload.highScore,
       };
     case 'START_GAME':
@@ -90,6 +92,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         birdVelocity: JUMP_STRENGTH,
       };
+    case 'INCREMENT_SCORE':
+        return { ...state, score: state.score + 1 };
     case 'SET_GAME_OVER':
        if (state.status === 'over') return state;
        const isNewHighScore = state.score > state.highScore;
@@ -107,26 +111,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       // Met à jour la position de l'oiseau.
       const newPosition = state.birdPosition + newVelocity;
       
-      // Gère le mouvement et la création des tuyaux.
       let newPipes = state.pipes
         .map(pipe => ({ ...pipe, x: pipe.x - PIPE_SPEED }))
         .filter(pipe => pipe.x > -PIPE_WIDTH);
+        
+      let scoreIncremented = false;
+      newPipes.forEach(pipe => {
+        if (!pipe.passed && pipe.x + PIPE_WIDTH < GAME_WIDTH / 2) {
+            pipe.passed = true;
+            scoreIncremented = true;
+        }
+      });
+      if(scoreIncremented) {
+          // On ne peut pas appeler un autre dispatch ici, donc on met à jour directement le score.
+          // dispatch({ type: 'INCREMENT_SCORE' });
+      }
 
-      let updatedScore = state.score;
       let newLastPipeTime = state.lastPipeTime;
-      
       // Crée un nouveau tuyau à intervalle régulier.
       if (Date.now() - state.lastPipeTime > PIPE_INTERVAL) {
         const minPipeHeight = 80;
         const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 120;
         const topHeight = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
-        newPipes.push({ x: GAME_WIDTH, topHeight: topHeight });
+        newPipes.push({ x: GAME_WIDTH, topHeight: topHeight, passed: false });
         newLastPipeTime = Date.now();
-        
-        // Incrémente le score à chaque nouveau tuyau (après le début du jeu).
-        if(state.startTime !== null) {
-            updatedScore++;
-        }
       }
 
       return {
@@ -134,7 +142,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         birdVelocity: newVelocity,
         birdPosition: newPosition,
         pipes: newPipes,
-        score: updatedScore,
+        score: scoreIncremented ? state.score + 1 : state.score,
         lastPipeTime: newLastPipeTime,
       };
     }
@@ -230,13 +238,10 @@ export function FlippyBirdGame() {
   useEffect(() => {
     if(status === 'over' && !statsUpdated && user && startTime !== null) {
         const playtimeInSeconds = Math.round((Date.now() - startTime) / 1000);
-        const existingStats = user.stats.games["Flippy Bird"];
-        
         updateUserStats("Flippy Bird", {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
+            highScore: score,
             totalPlaytime: playtimeInSeconds,
-            pipesPassed: (existingStats.pipesPassed || 0) + score,
+            pipesPassed: score,
         });
         setStatsUpdated(true);
     }

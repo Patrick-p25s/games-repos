@@ -87,15 +87,10 @@ export function SnakeGame() {
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated && user && startTimeRef.current > 0) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-        const existingStats = user.stats.games.Snake;
-        if (score > existingStats.highScore) {
-          setHighScore(score);
-        }
         updateUserStats('Snake', {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
+            highScore: score,
             totalPlaytime: playtimeInSeconds,
-            applesEaten: (existingStats.applesEaten || 0) + applesEaten,
+            applesEaten: applesEaten,
         });
         setStatsUpdated(true);
         startTimeRef.current = 0;

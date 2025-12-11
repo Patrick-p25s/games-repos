@@ -1,4 +1,4 @@
-
+// Ce fichier contient le composant client pour le jeu de quiz.
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -129,12 +129,13 @@ export function QuizClient() {
 
     // Simulate a brief loading period for a better user experience.
     setTimeout(() => {
-      const languageQuestions = staticQuizData[language];
+      const languageQuestions = staticQuizData[language] || staticQuizData['en'];
       const shuffledQuestions = shuffleArray(languageQuestions).slice(0, 15);
       dispatch({ type: 'START_QUIZ', payload: { questions: shuffledQuestions }});
     }, 500);
 
   }, [language]);
+
 
   const handleNextQuestion = () => {
     if (selectedAnswer === null) {
@@ -158,17 +159,16 @@ export function QuizClient() {
     if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
         const playtimeInSeconds = startTimeRef.current > 0 ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
         const existingStats = user.stats.games.Quiz;
-        const totalCorrect = (existingStats.totalCorrect || 0) + score;
-        const totalQuestions = (existingStats.totalQuestions || 0) + questions.length;
-        const newAvgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        const newTotalCorrect = (existingStats.totalCorrect || 0) + score;
+        const newTotalQuestions = (existingStats.totalQuestions || 0) + questions.length;
+        const newAvgAccuracy = newTotalQuestions > 0 ? Math.round((newTotalCorrect / newTotalQuestions) * 100) : 0;
 
         updateUserStats('Quiz', {
-            gamesPlayed: existingStats.gamesPlayed + 1,
-            highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            highScore: score,
+            totalPlaytime: playtimeInSeconds,
             avgAccuracy: newAvgAccuracy,
-            totalCorrect,
-            totalQuestions,
+            totalCorrect: newTotalCorrect,
+            totalQuestions: newTotalQuestions,
         });
         dispatch({ type: 'STATS_UPDATED' });
     }
@@ -177,7 +177,7 @@ export function QuizClient() {
   // Render the lobby screen.
   if (status === "lobby") {
     return (
-      <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+      <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
           {gameImage && (
             <CardHeader className="relative h-48 w-full">
@@ -318,5 +318,3 @@ export function QuizClient() {
     </div>
   );
 }
-
-    
