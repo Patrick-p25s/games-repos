@@ -44,6 +44,7 @@ export function MemoryGame() {
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
   const [isWon, setIsWon] = useState(false);
+  const [score, setScore] = useState(0);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,24 +68,26 @@ export function MemoryGame() {
     setIsWon(won);
     setGameState('over');
     if (timerRef.current) clearInterval(timerRef.current);
-  }, []);
+    const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
+    const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - (finalTime * 5)) : 0;
+    setScore(calculatedScore);
+  }, [moves]);
   
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-        const score = isWon ? Math.max(0, 10000 - (moves * 10) - (playtimeInSeconds * 5)) : 0;
         const existingStats = user.stats.games.Memory;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
         
         updateUserStats('Memory', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
         setStatsUpdated(true);
     }
-  }, [gameState, moves, isWon, user, statsUpdated, updateUserStats]);
+  }, [gameState, score, isWon, user, statsUpdated, updateUserStats]);
 
   useEffect(() => {
     setCards(generateCards());
@@ -95,6 +98,7 @@ export function MemoryGame() {
     setFlippedCards([]);
     setMoves(0);
     setTime(0);
+    setScore(0);
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
@@ -164,7 +168,7 @@ export function MemoryGame() {
 
   if (gameState === 'lobby') {
     return (
-      <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+      <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
           {gameImage && (
             <CardHeader className="relative h-48 w-full">
@@ -200,7 +204,7 @@ export function MemoryGame() {
   
   if (gameState === 'over') {
     return (
-        <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
                     {isWon ? (
@@ -214,6 +218,7 @@ export function MemoryGame() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-md text-gray-600 dark:text-gray-400">{t('timeTaken')}: <span className="font-bold">{time}s</span></p>
+                    {isWon && <p className="text-lg font-semibold">{t('score')}: {score}</p>}
                 </CardContent>
                 <CardContent className="flex flex-col gap-4">
                     <Button onClick={startGame} size="lg">

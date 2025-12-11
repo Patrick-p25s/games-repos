@@ -151,7 +151,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!userToSave.stats) userToSave.stats = JSON.parse(JSON.stringify(defaultStats));
         localStorage.setItem("nextgen-games-user", JSON.stringify(userToSave));
         
-        // Update the user's data within the allUsers array
         setAllUsers(prevAllUsers => {
             const existingUsers = [...prevAllUsers];
             const userIndex = existingUsers.findIndex(u => u.id === userToSave.id);
@@ -218,36 +217,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveUser]);
   
   const updateUserStats = useCallback((game: keyof User['stats']['games'], newStats: Partial<GameStats>) => {
-     setUser(currentUser => {
-       if (currentUser) {
-        const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(currentUser.stats)) as User['stats']}; // Deep copy
-        const gameStats = updatedUser.stats.games[game];
-        
-        updatedUser.stats.games[game] = { ...gameStats, ...newStats };
+    setUser(currentUser => {
+      if (!currentUser) return null;
+      
+      const updatedUser = JSON.parse(JSON.stringify(currentUser)) as User;
+      const gameStats = updatedUser.stats.games[game];
 
-        // Recalculate overall stats
-        updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
-        
-        const totalSeconds = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
-        
-        let favoriteGame = "N/A";
-        let maxPlaytime = -1;
+      // Update the specific game's stats
+      updatedUser.stats.games[game] = { ...gameStats, ...newStats };
+      
+      // Always increment games played
+      updatedUser.stats.games[game].gamesPlayed = gameStats.gamesPlayed + 1;
+      
+      // Update total playtime for the specific game
+      updatedUser.stats.games[game].totalPlaytime = gameStats.totalPlaytime + (newStats.totalPlaytime || 0);
 
-        for (const [gameName, gameStats] of Object.entries(updatedUser.stats.games)) {
-            if (gameStats.totalPlaytime > maxPlaytime) {
-                maxPlaytime = gameStats.totalPlaytime;
-                favoriteGame = gameName;
-            }
-        }
-        updatedUser.stats.overall.favoriteGame = favoriteGame;
+      // Recalculate overall stats
+      updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
+      
+      const totalSeconds = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
+      
+      let favoriteGame = "N/A";
+      let maxPlaytime = -1;
 
-        saveUser(updatedUser);
-        return updatedUser;
+      for (const [gameName, gameData] of Object.entries(updatedUser.stats.games)) {
+          if (gameData.totalPlaytime > maxPlaytime) {
+              maxPlaytime = gameData.totalPlaytime;
+              favoriteGame = gameName;
+          }
       }
-      return null;
+      updatedUser.stats.overall.favoriteGame = favoriteGame;
+
+      saveUser(updatedUser);
+      return updatedUser;
     });
   }, [saveUser]);
   
@@ -282,35 +287,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [allFeedback, saveFeedback]);
 
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
-    const newInboxMessage: InboxMessage = {
-        id: `msg-${Date.now()}`,
-        subject: `Re: ${subject}`,
-        message,
-        date: new Date().toLocaleDateString('en-CA'),
-    };
-    
-    const updatedUsers = allUsers.map(u => {
-        if (u.id === userId) {
-            return {
-                ...u,
-                inbox: [newInboxMessage, ...(u.inbox || [])],
-            };
-        }
-        return u;
-    });
-
-    saveAllUsers(updatedUsers);
-
-    if (user && user.id === userId) {
-        setUser(prevUser => {
-            if (!prevUser) return null;
-            return {
-                ...prevUser,
-                inbox: [newInboxMessage, ...(prevUser.inbox || [])]
-            };
+    setAllUsers(currentAllUsers => {
+        let userFound = false;
+        const updatedUsers = currentAllUsers.map(u => {
+            if (u.id === userId) {
+                userFound = true;
+                const newInboxMessage: InboxMessage = {
+                    id: `msg-${Date.now()}`,
+                    subject: `Re: ${subject}`,
+                    message,
+                    date: new Date().toLocaleDateString('en-CA'),
+                };
+                // Return a new user object with the new message
+                return {
+                    ...u,
+                    inbox: [newInboxMessage, ...(u.inbox || [])],
+                };
+            }
+            return u;
         });
-    }
-  }, [allUsers, user, saveAllUsers, setUser]);
+
+        if (userFound) {
+            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(updatedUsers));
+
+            // If the currently logged-in user is the one receiving the message, update their state too
+            if (user && user.id === userId) {
+                const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
+                if (updatedLoggedInUser) {
+                    localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
+                    setUser(updatedLoggedInUser);
+                }
+            }
+        }
+        return updatedUsers;
+    });
+  }, [user]);
 
   const deleteMessage = useCallback((messageId: string) => {
     if (!user) return;

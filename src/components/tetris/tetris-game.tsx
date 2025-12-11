@@ -79,8 +79,8 @@ export function TetrisGame() {
         updateUserStats('Tetris', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
-            linesCleared: existingStats.linesCleared + linesCleared,
+            totalPlaytime: playtimeInSeconds,
+            linesCleared: linesCleared,
         });
         setStatsUpdated(true);
     }
@@ -159,21 +159,27 @@ export function TetrisGame() {
 
         // Clear lines
         let clearedRowCount = 0;
-        for (let y = newBoard.length - 1; y >= 0; y--) {
-            if (newBoard[y].every(cell => cell.filled)) {
-                newBoard.splice(y, 1);
-                newBoard.unshift(Array(COLS).fill({ filled: false, color: '' }));
+        let tempBoard = [...newBoard];
+        let linesToClear = [];
+
+        for (let y = tempBoard.length - 1; y >= 0; y--) {
+            if (tempBoard[y].every(cell => cell.filled)) {
+                linesToClear.push(y);
                 clearedRowCount++;
-                y++;
             }
         }
-        
+
         if (clearedRowCount > 0) {
+            linesToClear.sort((a,b) => a - b).forEach(y => {
+                 tempBoard.splice(y, 1);
+                 tempBoard.unshift(Array(COLS).fill({ filled: false, color: '' }));
+            });
+            setBoard(tempBoard);
             setScore(s => s + [0, 100, 300, 500, 800][clearedRowCount] * level);
             setLinesCleared(l => l + clearedRowCount);
+        } else {
+            setBoard(newBoard);
         }
-
-        setBoard(newBoard);
         
         const newPieceTetromino = randomTetromino();
         const newPiece = {
@@ -182,7 +188,7 @@ export function TetrisGame() {
             shape: newPieceTetromino.shape,
         };
 
-        if (!isValidMove(newPiece.shape, newPiece.pos, newBoard)) {
+        if (!isValidMove(newPiece.shape, newPiece.pos, tempBoard)) {
             endGame();
             // Return previous piece to avoid setting an invalid one
             return prev;
@@ -289,7 +295,7 @@ export function TetrisGame() {
   
   if (gameState === 'lobby') {
     return (
-      <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+      <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
           {gameImage && (
             <CardHeader className="relative h-48 w-full">
@@ -325,7 +331,7 @@ export function TetrisGame() {
 
   if (gameState === 'over') {
     return (
-        <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
                     <CardTitle className="text-3xl font-bold text-red-500 font-headline">{t('gameOver')}</CardTitle>

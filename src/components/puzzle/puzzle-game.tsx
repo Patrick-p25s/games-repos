@@ -91,6 +91,7 @@ export function PuzzleGame() {
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
   const [isWon, setIsWon] = useState(false);
+  const [score, setScore] = useState(0);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>();
   const gameImage = useMemo(() => PlaceHolderImages.find(img => img.id === 'puzzle'), []);
@@ -101,24 +102,26 @@ export function PuzzleGame() {
     setIsWon(won);
     setGameState('over');
     if (timerRef.current) clearInterval(timerRef.current);
-  }, []);
+    const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
+    const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - finalTime) : 0;
+    setScore(calculatedScore);
+  }, [moves]);
 
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-        const score = isWon ? Math.max(0, 10000 - (moves * 10) - playtimeInSeconds) : 0;
         const existingStats = user.stats.games.Puzzle;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
         
         updateUserStats('Puzzle', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
         setStatsUpdated(true);
     }
-  }, [gameState, moves, isWon, user, statsUpdated, updateUserStats]);
+  }, [gameState, score, isWon, user, statsUpdated, updateUserStats]);
 
   useEffect(() => {
     const { grid: newGrid, emptyPos: newEmptyPos } = createGrid();
@@ -144,6 +147,7 @@ export function PuzzleGame() {
     setEmptyPos(newEmptyPos);
     setMoves(0);
     setTime(0);
+    setScore(0);
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
@@ -171,7 +175,7 @@ export function PuzzleGame() {
   
   if (gameState === 'lobby') {
     return (
-      <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+      <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
           {gameImage && (
             <CardHeader className="relative h-48 w-full">
@@ -207,7 +211,7 @@ export function PuzzleGame() {
 
   if (gameState === 'over') {
     return (
-        <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
                     {isWon ? (
@@ -221,6 +225,7 @@ export function PuzzleGame() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-md text-gray-600 dark:text-gray-400">{t('timeTaken')}: <span className="font-bold">{time}s</span></p>
+                    {isWon && <p className="text-lg font-semibold">{t('score')}: {score}</p>}
                 </CardContent>
                 <CardContent className="flex flex-col gap-4">
                     <Button onClick={startGame} size="lg">

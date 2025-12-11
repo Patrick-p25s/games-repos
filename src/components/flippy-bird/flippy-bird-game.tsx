@@ -106,14 +106,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         .filter(pipe => pipe.x > -PIPE_WIDTH);
 
       let updatedScore = state.score;
-      const birdX = GAME_WIDTH / 2;
-      
-      state.pipes.forEach(pipe => {
-        const pipeCenterX = pipe.x + PIPE_WIDTH / 2;
-        if (pipeCenterX > birdX - PIPE_SPEED && pipeCenterX <= birdX) {
-            updatedScore++;
-        }
-      });
       
       let newLastPipeTime = state.lastPipeTime;
       if (Date.now() - state.lastPipeTime > PIPE_INTERVAL) {
@@ -122,6 +114,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const topHeight = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
         newPipes.push({ x: GAME_WIDTH, topHeight: topHeight });
         newLastPipeTime = Date.now();
+        // Increment score for every new pipe generated after the game starts
+        updatedScore++;
       }
 
       return {
@@ -222,7 +216,7 @@ export function FlippyBirdGame() {
         updateUserStats("Flippy Bird", {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            totalPlaytime: playtimeInSeconds,
             pipesPassed: (existingStats.pipesPassed || 0) + score,
         });
         setStatsUpdated(true);
@@ -256,7 +250,7 @@ export function FlippyBirdGame() {
 
   if (status === 'lobby') {
     return (
-      <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+      <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
           {gameImage && (
             <CardHeader className="relative h-48 w-full">
@@ -269,7 +263,7 @@ export function FlippyBirdGame() {
               />
             </CardHeader>
           )}
-          <CardContent>
+          <CardContent className="p-6">
             <CardTitle className="text-3xl font-headline">{t('flippybird')}</CardTitle>
             <CardDescription className="text-lg mt-2 mb-6">{t('flippyBirdInstruction')}</CardDescription>
             <div className="flex flex-col gap-4">
@@ -292,7 +286,7 @@ export function FlippyBirdGame() {
   
   if (status === 'over') {
     return (
-        <div className="container flex flex-col items-center justify-center min-h-screen py-8">
+        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
                     <CardTitle className="text-3xl font-bold text-destructive font-headline">{t('gameOver')}</CardTitle>
@@ -383,5 +377,3 @@ export function FlippyBirdGame() {
     </div>
   );
 }
-
-    
