@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, RotateCcw, Play } from 'lucide-react';
+import { Home, RotateCcw, Play, Bird } from 'lucide-react';
 import Link from 'next/link';
 import { useLocale } from '@/contexts/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -344,14 +344,15 @@ export function FlippyBirdGame() {
               </div>
             )}
 
-            <div
-                className="absolute bg-yellow-400 rounded-full border-2 border-black"
+            <Bird
+                className="absolute text-yellow-400 drop-shadow-lg"
                 style={{
                     width: BIRD_SIZE,
                     height: BIRD_SIZE,
                     left: (GAME_WIDTH / 2) - (BIRD_SIZE / 2),
                     transform: `translateY(${birdPosition}px) rotate(${birdRotation}deg)`,
                     transition: status === 'playing' ? 'transform 100ms linear' : 'none',
+                    fill: 'currentColor',
                 }}
             />
 
