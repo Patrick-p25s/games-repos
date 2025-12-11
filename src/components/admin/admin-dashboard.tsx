@@ -67,7 +67,7 @@ const replySchema = z.object({
 
 function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     const { t } = useLocale();
-    const { sendReply } = useAuth();
+    const { sendReply, deleteFeedback } = useAuth();
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
 
@@ -80,6 +80,8 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
 
     function onSubmit(values: z.infer<typeof replySchema>) {
         sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
+        // After replying, we can remove the feedback item from the admin's queue
+        deleteFeedback(feedbackItem.id);
         toast({
           title: t('replySent'),
           description: t('replySentMessage', { name: feedbackItem.name }),
@@ -306,7 +308,7 @@ export function AdminDashboard() {
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteFeedback(item.id)}>{t('delete')}</AlertDialogAction>
+                                            <AlertDialogAction onClick={() => handleDeleteFeedback(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('delete')}</AlertDialogAction>
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>

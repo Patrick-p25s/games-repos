@@ -277,12 +277,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, saveFeedback]);
 
   const deleteFeedback = useCallback((feedbackId: number) => {
+    const feedbackToDelete = allFeedback.find(f => f.id === feedbackId);
+    if (!feedbackToDelete) return;
+
     setAllFeedback(currentFeedback => {
         const updatedFeedback = currentFeedback.filter(f => f.id !== feedbackId);
         saveFeedback(updatedFeedback);
         return updatedFeedback;
     });
-  }, [saveFeedback]);
+
+    // Also delete the reply from the user's inbox if it exists
+    setAllUsers(currentUsers => {
+      const usersCopy = [...currentUsers];
+      const userIndex = usersCopy.findIndex(u => u.id === feedbackToDelete.userId);
+
+      if (userIndex > -1) {
+        const targetUser = { ...usersCopy[userIndex] };
+        targetUser.inbox = (targetUser.inbox || []).filter(msg => msg.subject !== `Re: ${feedbackToDelete.subject}`);
+        usersCopy[userIndex] = targetUser;
+
+        if (user?.id === targetUser.id) {
+          setUser(targetUser);
+          localStorage.setItem("nextgen-games-user", JSON.stringify(targetUser));
+        }
+        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
+      }
+      return usersCopy;
+    });
+  }, [allFeedback, saveFeedback, user]);
 
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
     setAllUsers(currentUsers => {
@@ -296,31 +318,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 message,
                 date: new Date().toLocaleDateString('en-CA'),
             };
+            const targetUser = usersCopy[userIndex];
+            
+            // This creates a new user object with a new inbox array.
+            const updatedUser = {
+                ...targetUser,
+                inbox: [newInboxMessage, ...(targetUser.inbox || [])]
+            };
 
-            const targetUser = { ...usersCopy[userIndex] };
-            targetUser.inbox = [newInboxMessage, ...(targetUser.inbox || [])];
-            usersCopy[userIndex] = targetUser;
-
+            usersCopy[userIndex] = updatedUser;
+            
+            // If the logged-in user is the one being updated, update their state too
             if (user?.id === userId) {
-                setUser(targetUser);
+                setUser(updatedUser);
             }
-            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
         }
+        // Save the entire updated user list to localStorage
+        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
         return usersCopy;
     });
   }, [user]);
 
   const deleteMessage = useCallback((messageId: string) => {
-    setUser(currentUser => {
-        if (!currentUser) return null;
+    if (!user) return;
 
-        const updatedInbox = currentUser.inbox.filter(msg => msg.id !== messageId);
-        const updatedUser = { ...currentUser, inbox: updatedInbox };
-        
-        saveUser(updatedUser);
-        return updatedUser;
-    });
-  }, [saveUser]);
+    const updatedUser = {
+      ...user,
+      inbox: user.inbox.filter(msg => msg.id !== messageId)
+    };
+
+    saveUser(updatedUser);
+  }, [user, saveUser]);
 
   const incrementViewCount = useCallback(() => {
     try {
@@ -359,3 +387,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    

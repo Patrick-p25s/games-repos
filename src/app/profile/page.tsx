@@ -34,8 +34,7 @@ function Inbox() {
   const { t } = useLocale();
   const { toast } = useToast();
 
-  const handleDelete = (messageId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevents the accordion from toggling
+  const handleDelete = (messageId: string) => {
     deleteMessage(messageId);
     toast({
         title: t('messageDeleted'),
@@ -96,7 +95,7 @@ function Inbox() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                                <AlertDialogAction onClick={(e) => handleDelete(msg.id, e)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                <AlertDialogAction onClick={() => handleDelete(msg.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                                     {t('delete')}
                                 </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -151,3 +150,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
