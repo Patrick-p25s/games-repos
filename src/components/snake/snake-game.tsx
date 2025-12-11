@@ -15,7 +15,6 @@ const GRID_SIZE = 20;
 const TILE_SIZE = 18; // Reduced from 20
 const GAME_DIMENSION = GRID_SIZE * TILE_SIZE;
 const INITIAL_SPEED = 200; // Slower start
-const GAME_TIME_LIMIT = 90; // 90 seconds
 
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type Position = { x: number; y: number };
@@ -30,8 +29,7 @@ export function SnakeGame() {
   const [speed, setSpeed] = useState<number>(INITIAL_SPEED);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
-  const [startTime, setStartTime] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME_LIMIT);
+  const [time, setTime] = useState(0);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout>();
   const timerRef = useRef<NodeJS.Timeout>();
@@ -47,7 +45,6 @@ export function SnakeGame() {
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated) {
         if(user) {
-            const playtime = startTime > 0 ? Math.min(GAME_TIME_LIMIT, Math.round((Date.now() - startTime) / 1000)) : 0;
             const existingStats = user.stats.games.Snake;
             if (score > existingStats.highScore) {
               setHighScore(score);
@@ -55,13 +52,13 @@ export function SnakeGame() {
             updateUserStats('Snake', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + Math.round(playtime / 60),
+                totalPlaytime: existingStats.totalPlaytime + time,
                 applesEaten: (existingStats.applesEaten || 0) + (score / 10),
             });
             setStatsUpdated(true);
         }
     }
-  }, [gameState, score, user, updateUserStats, startTime, statsUpdated]);
+  }, [gameState, score, time, user, updateUserStats, statsUpdated]);
 
 
   useEffect(() => {
@@ -88,13 +85,12 @@ export function SnakeGame() {
     setDirection('RIGHT');
     setSpeed(INITIAL_SPEED);
     setScore(0);
-    setTimeLeft(GAME_TIME_LIMIT);
+    setTime(0);
     setStatsUpdated(false);
   }, []);
 
   const startGame = useCallback(() => {
     resetGame();
-    setStartTime(Date.now());
     setGameState('playing');
   }, [resetGame]);
 
@@ -151,13 +147,7 @@ export function SnakeGame() {
       gameLoopRef.current = setInterval(moveSnake, speed);
       
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            endGame();
-            return 0;
-          }
-          return prev - 1;
-        });
+        setTime(prev => prev + 1);
       }, 1000);
 
       return () => {
@@ -275,8 +265,8 @@ export function SnakeGame() {
     )
   }
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -328,3 +318,4 @@ export function SnakeGame() {
   );
 }
 
+    

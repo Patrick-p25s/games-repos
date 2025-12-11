@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 const COLS = 10;
 const ROWS = 20;
 const BLOCK_SIZE = 25; // Adjusted for mobile
-const GAME_TIME_LIMIT = 120; // 2 minutes
 
 const TETROMINOS = {
   'I': { shape: [[1, 1, 1, 1]], color: 'bg-cyan-500 border-cyan-300' },
@@ -46,8 +45,7 @@ export function TetrisGame() {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [linesCleared, setLinesCleared] = useState(0);
-  const [startTime, setStartTime] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME_LIMIT);
+  const [time, setTime] = useState(0);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const gameImage = PlaceHolderImages.find(img => img.id === 'tetris');
 
@@ -75,18 +73,17 @@ export function TetrisGame() {
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated) {
         if(user) {
-            const playtime = startTime > 0 ? Math.min(GAME_TIME_LIMIT, Math.round((Date.now() - startTime) / 1000)) : 0;
             const existingStats = user.stats.games.Tetris;
             updateUserStats('Tetris', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + Math.round(playtime / 60),
+                totalPlaytime: existingStats.totalPlaytime + time,
                 linesCleared: existingStats.linesCleared + linesCleared,
             });
             setStatsUpdated(true);
         }
     }
-  }, [gameState, score, linesCleared, user, updateUserStats, startTime, statsUpdated]);
+  }, [gameState, score, linesCleared, time, user, updateUserStats, statsUpdated]);
 
   const resetGame = useCallback(() => {
     const newPieceTetromino = randomTetromino();
@@ -99,7 +96,7 @@ export function TetrisGame() {
     setScore(0);
     setLevel(1);
     setLinesCleared(0);
-    setTimeLeft(GAME_TIME_LIMIT);
+    setTime(0);
     setStatsUpdated(false);
   }, [randomTetromino]);
   
@@ -109,7 +106,6 @@ export function TetrisGame() {
 
   const startGame = useCallback(() => {
     resetGame();
-    setStartTime(Date.now());
     setGameState('playing');
   }, [resetGame]);
 
@@ -198,13 +194,7 @@ export function TetrisGame() {
       gameLoopRef.current = setInterval(drop, gameSpeed);
       
       timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            endGame();
-            return 0;
-          }
-          return prev - 1;
-        });
+        setTime(prev => prev + 1);
       }, 1000);
 
       return () => {
@@ -212,7 +202,7 @@ export function TetrisGame() {
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [gameState, drop, level, endGame]);
+  }, [gameState, drop, level]);
 
   const move = (dir: -1 | 1) => {
     if (gameState !== 'playing') return;
@@ -351,8 +341,8 @@ export function TetrisGame() {
     )
   }
   
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 py-8 bg-background text-foreground">

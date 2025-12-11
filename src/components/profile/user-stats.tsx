@@ -30,6 +30,13 @@ export function UserStats() {
 
     const { stats } = user;
 
+    const formatPlaytime = (seconds: number): string => {
+        if (seconds === 0) return '0m';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${h > 0 ? `${h}h ` : ''}${m}m`;
+    }
+
     const getSafeStat = (game: string, stat: string, defaultValue: string | number = 0) => {
         const gameData = stats.games[game as keyof typeof stats.games];
         if (!gameData || !(stat in gameData)) {
@@ -43,37 +50,37 @@ export function UserStats() {
             { title: "gamesPlayed", value: getSafeStat("Quiz", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Quiz", "highScore") as number).toLocaleString() },
             { title: "avgAccuracy", value: `${getSafeStat("Quiz", "avgAccuracy")}%` },
-            { title: "totalPlaytime", value: `${getSafeStat("Quiz", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Quiz", "totalPlaytime") as number) },
         ]},
         { name: "Tetris", stats: [
             { title: "gamesPlayed", value: getSafeStat("Tetris", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Tetris", "highScore") as number).toLocaleString() },
             { title: "linesCleared", value: getSafeStat("Tetris", "linesCleared") },
-            { title: "totalPlaytime", value: `${getSafeStat("Tetris", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Tetris", "totalPlaytime") as number) },
         ]},
         { name: "Snake", stats: [
             { title: "gamesPlayed", value: getSafeStat("Snake", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Snake", "highScore") as number).toLocaleString() },
             { title: "applesEaten", value: getSafeStat("Snake", "applesEaten") },
-            { title: "totalPlaytime", value: `${getSafeStat("Snake", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Snake", "totalPlaytime") as number) },
         ]},
         { name: "Flippy Bird", stats: [
             { title: "gamesPlayed", value: getSafeStat("Flippy Bird", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Flippy Bird", "highScore") as number).toLocaleString() },
             { title: "pipesPassed", value: getSafeStat("Flippy Bird", "pipesPassed") },
-            { title: "totalPlaytime", value: `${getSafeStat("Flippy Bird", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Flippy Bird", "totalPlaytime") as number) },
         ]},
         { name: "Memory", stats: [
             { title: "gamesPlayed", value: getSafeStat("Memory", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Memory", "highScore") as number).toLocaleString() },
             { title: "bestTime", value: `${getSafeStat("Memory", "bestTime")}s` },
-            { title: "totalPlaytime", value: `${getSafeStat("Memory", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Memory", "totalPlaytime") as number) },
         ]},
         { name: "Puzzle", stats: [
             { title: "gamesPlayed", value: getSafeStat("Puzzle", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Puzzle", "highScore") as number).toLocaleString() },
             { title: "bestTime", value: `${getSafeStat("Puzzle", "bestTime")}s` },
-            { title: "totalPlaytime", value: `${getSafeStat("Puzzle", "totalPlaytime")}m` },
+            { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Puzzle", "totalPlaytime") as number) },
         ]},
     ];
 
@@ -176,3 +183,5 @@ export function UserStats() {
         </div>
     );
 }
+
+    

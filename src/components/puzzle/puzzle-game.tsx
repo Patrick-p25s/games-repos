@@ -15,7 +15,6 @@ import { useAuth } from '@/contexts/auth-context';
 const GRID_SIZE = 4;
 const TILE_SIZE = 80;
 const GAME_DIMENSION = TILE_SIZE * GRID_SIZE;
-const GAME_TIME_LIMIT = 300; // 5 minutes
 
 type Tile = number | null;
 type Grid = Tile[][];
@@ -91,7 +90,6 @@ export function PuzzleGame() {
   const [emptyPos, setEmptyPos] = useState<Position>({ row: 0, col: 0 });
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME_LIMIT);
   const [isWon, setIsWon] = useState(false);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>();
@@ -112,7 +110,7 @@ export function PuzzleGame() {
             updateUserStats('Puzzle', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + Math.round(time / 60),
+                totalPlaytime: existingStats.totalPlaytime + time,
                 bestTime: newBestTime,
             });
             setStatsUpdated(true);
@@ -128,26 +126,15 @@ export function PuzzleGame() {
 
   useEffect(() => {
     if (gameState === 'playing') {
-      const gameTimer = setInterval(() => {
+      timerRef.current = setInterval(() => {
         setTime(prevTime => prevTime + 1);
       }, 1000);
       
-      timerRef.current = setInterval(() => {
-          setTimeLeft(prev => {
-              if (prev <= 1) {
-                  endGame();
-                  return 0;
-              }
-              return prev - 1;
-          })
-      }, 1000);
-
       return () => {
-        clearInterval(gameTimer);
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [gameState, endGame]);
+  }, [gameState]);
 
   const startGame = useCallback(() => {
     const { grid: newGrid, emptyPos: newEmptyPos } = createGrid();
@@ -155,7 +142,6 @@ export function PuzzleGame() {
     setEmptyPos(newEmptyPos);
     setMoves(0);
     setTime(0);
-    setTimeLeft(GAME_TIME_LIMIT);
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
@@ -251,8 +237,8 @@ export function PuzzleGame() {
     )
   }
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -316,3 +302,4 @@ export function PuzzleGame() {
   );
 }
 
+    

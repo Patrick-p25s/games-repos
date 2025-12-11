@@ -157,7 +157,7 @@ export function QuizClient() {
   // This effect runs once when the game is finished to update the user's stats.
   useEffect(() => {
     if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
-        const playtime = startTime > 0 ? Math.round((Date.now() - startTime) / 60000) : 0;
+        const playtimeInSeconds = startTime > 0 ? Math.round((Date.now() - startTime) / 1000) : 0;
         const existingStats = user.stats.games.Quiz;
         const totalCorrect = (existingStats.totalCorrect || 0) + score;
         const totalQuestions = (existingStats.totalQuestions || 0) + questions.length;
@@ -166,7 +166,7 @@ export function QuizClient() {
         updateUserStats('Quiz', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtime,
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
             avgAccuracy: newAvgAccuracy,
             totalCorrect,
             totalQuestions,
@@ -319,3 +319,5 @@ export function QuizClient() {
     </div>
   );
 }
+
+    

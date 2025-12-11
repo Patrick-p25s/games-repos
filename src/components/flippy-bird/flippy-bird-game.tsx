@@ -216,13 +216,13 @@ export function FlippyBirdGame() {
   
   useEffect(() => {
     if(status === 'over' && !statsUpdated && user && startTime !== null) {
-        const playtime = Math.round((Date.now() - startTime) / 60000);
+        const playtimeInSeconds = Math.round((Date.now() - startTime) / 1000);
         const existingStats = user.stats.games["Flippy Bird"];
         
         updateUserStats("Flippy Bird", {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: existingStats.totalPlaytime + playtime,
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
             pipesPassed: (existingStats.pipesPassed || 0) + score,
         });
         setStatsUpdated(true);
@@ -383,3 +383,5 @@ export function FlippyBirdGame() {
     </div>
   );
 }
+
+    

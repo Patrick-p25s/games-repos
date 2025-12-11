@@ -23,7 +23,6 @@ const icons = [Bird, BrainCog, Puzzle, Blocks, Bot, Gamepad2, Star, Trophy];
 const GRID_SIZE = 4; // 4x4 grid
 const CARD_COUNT = GRID_SIZE * GRID_SIZE;
 const PAIRS_COUNT = CARD_COUNT / 2;
-const GAME_TIME_LIMIT = 90; // 90 seconds
 
 type CardState = {
     id: number;
@@ -44,7 +43,6 @@ export function MemoryGame() {
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME_LIMIT);
   const [isWon, setIsWon] = useState(false);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,7 +77,7 @@ export function MemoryGame() {
             updateUserStats('Memory', {
                 gamesPlayed: existingStats.gamesPlayed + 1,
                 highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: existingStats.totalPlaytime + Math.round(time / 60),
+                totalPlaytime: existingStats.totalPlaytime + time,
                 bestTime: newBestTime,
             });
             setStatsUpdated(true);
@@ -96,7 +94,6 @@ export function MemoryGame() {
     setFlippedCards([]);
     setMoves(0);
     setTime(0);
-    setTimeLeft(GAME_TIME_LIMIT);
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
@@ -104,26 +101,15 @@ export function MemoryGame() {
 
   useEffect(() => {
     if (gameState === 'playing') {
-      const gameTimer = setInterval(() => {
+      timerRef.current = setInterval(() => {
         setTime(prevTime => prevTime + 1);
       }, 1000);
 
-      timerRef.current = setInterval(() => {
-          setTimeLeft(prev => {
-              if (prev <= 1) {
-                  endGame();
-                  return 0;
-              }
-              return prev - 1;
-          })
-      }, 1000);
-
       return () => {
-        clearInterval(gameTimer);
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [gameState, endGame]);
+  }, [gameState]);
 
   const handleCardClick = (id: number) => {
     if (gameState !== 'playing' || flippedCards.length === 2) return;
@@ -245,8 +231,8 @@ export function MemoryGame() {
     )
   }
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
 
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -290,3 +276,4 @@ export function MemoryGame() {
   );
 }
 
+    

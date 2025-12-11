@@ -6,7 +6,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 type GameStats = {
   gamesPlayed: number;
   highScore: number;
-  totalPlaytime: number; // in minutes
+  totalPlaytime: number; // in seconds
   [key: string]: number | string; // Allows for game-specific stats like 'linesCleared'
 };
 
@@ -105,9 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // On initial mount, load all data from localStorage.
   useEffect(() => {
     try {
-      // The line below can be uncommented to clear all data on first load for a fresh start
-      // if (typeof window !== 'undefined') { localStorage.clear(); }
-
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
       if (storedAllUsers) {
         // Ensure data integrity on load
@@ -231,19 +228,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Recalculate overall stats
         updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
         
-        const totalMinutes = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
+        const totalSeconds = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
         updatedUser.stats.overall.totalPlaytime = `${hours}h ${minutes}m`;
         
         let favoriteGame = "N/A";
         let maxPlaytime = -1;
-        Object.entries(updatedUser.stats.games).forEach(([gameName, stats]) => {
-            if (stats.totalPlaytime > maxPlaytime) {
-                maxPlaytime = stats.totalPlaytime;
+
+        for (const [gameName, gameStats] of Object.entries(updatedUser.stats.games)) {
+            if (gameStats.totalPlaytime > maxPlaytime) {
+                maxPlaytime = gameStats.totalPlaytime;
                 favoriteGame = gameName;
             }
-        });
+        }
         updatedUser.stats.overall.favoriteGame = favoriteGame;
 
         saveUser(updatedUser);
@@ -264,7 +262,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [saveUser]);
   
-  // FIX: Simplified submitFeedback to prevent duplicates.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
     const newFeedback: Feedback = {
@@ -273,15 +270,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       date: new Date().toLocaleDateString('en-CA'),
       userId: user.id
     };
-    const updatedFeedback = [...allFeedback, newFeedback];
-    saveFeedback(updatedFeedback);
+    saveFeedback([...allFeedback, newFeedback]);
   }, [user, allFeedback, saveFeedback]);
 
   const deleteFeedback = useCallback((feedbackId: number) => {
     const feedbackToDelete = allFeedback.find(f => f.id === feedbackId);
     if (!feedbackToDelete) return;
 
-    // Remove the feedback item from the admin's view
     const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
     saveFeedback(updatedFeedback);
   }, [allFeedback, saveFeedback]);
@@ -294,10 +289,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date: new Date().toLocaleDateString('en-CA'),
     };
     
-    // Create a new array of users with the updated inbox for the target user.
     const updatedUsers = allUsers.map(u => {
         if (u.id === userId) {
-            // Create a new user object with a new inbox array.
             return {
                 ...u,
                 inbox: [newInboxMessage, ...(u.inbox || [])],
@@ -306,11 +299,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return u;
     });
 
-    // Save the entire updated list of users.
     saveAllUsers(updatedUsers);
 
-    // If the person being replied to is the currently logged-in user,
-    // we need to update their local state as well so they see the message instantly.
     if (user && user.id === userId) {
         setUser(prevUser => {
             if (!prevUser) return null;
@@ -325,25 +315,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteMessage = useCallback((messageId: string) => {
     if (!user) return;
     
-    // Create a new user object with the filtered inbox.
     const updatedUser = {
       ...user,
       inbox: user.inbox.filter(msg => msg.id !== messageId)
     };
     
-    // Save the updated user object, which will persist the changes.
     saveUser(updatedUser);
   }, [user, saveUser]);
 
   const incrementViewCount = useCallback(() => {
-    try {
-      const newCount = viewCount + 1;
-      localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-      setViewCount(newCount);
-    } catch (error) {
-      console.error("Failed to update view count in localStorage", error);
-    }
-  }, [viewCount]);
+    setViewCount(currentCount => {
+        const newCount = currentCount + 1;
+        try {
+            localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+        } catch (error) {
+            console.error("Failed to update view count in localStorage", error);
+        }
+        return newCount;
+    });
+  }, []);
 
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
@@ -369,3 +359,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    
