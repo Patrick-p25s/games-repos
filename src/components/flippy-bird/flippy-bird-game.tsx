@@ -21,7 +21,7 @@ const GRAVITY = 0.4; // Force de la gravité appliquée à l'oiseau.
 const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
 const PIPE_GAP = 220; // Espace vertical entre les tuyaux.
-const PIPE_SPEED = 2; // Vitesse de défilement des tuyaux.
+const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
 const PIPE_INTERVAL = 3000; // Temps en ms entre l'apparition de nouveaux tuyaux.
 
 type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
@@ -40,7 +40,6 @@ type GameState = {
   birdVelocity: number;
   pipes: Pipe[];
   score: number;
-  startTime: number | null;
   highScore: number;
   newHighScore: boolean;
 };
@@ -50,7 +49,7 @@ type GameAction =
   | { type: 'READY_GAME'; payload: { highScore: number } }
   | { type: 'START_GAME'; }
   | { type: 'SET_BIRD_VELOCITY'; payload: number }
-  | { type: 'GAME_TICK'; payload: { newPosition: number, newVelocity: number, newPipes: Pipe[], pipePassed: boolean, newLastPipeTime?: number }}
+  | { type: 'GAME_TICK'; payload: { newPosition: number, newVelocity: number, newPipes: Pipe[], pipePassed: boolean }}
   | { type: 'SET_GAME_OVER' }
   | { type: 'LOBBY' };
 
@@ -61,7 +60,6 @@ const initialState: GameState = {
   birdVelocity: 0,
   pipes: [],
   score: 0,
-  startTime: null,
   highScore: 0,
   newHighScore: false,
 };
@@ -84,7 +82,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         status: 'playing',
         birdVelocity: JUMP_STRENGTH,
-        startTime: Date.now(),
       };
     case 'SET_BIRD_VELOCITY':
       if (state.status !== 'playing') return state;
@@ -121,7 +118,7 @@ export function FlippyBirdGame() {
   const { t } = useLocale();
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(gameReducer, initialState);
-  const { status, birdPosition, birdVelocity, pipes, score, startTime, highScore, newHighScore } = state;
+  const { status, birdPosition, birdVelocity, pipes, score, highScore, newHighScore } = state;
   
   const [flash, setFlash] = useState(false);
   const [scoreJustIncreased, setScoreJustIncreased] = useState(false);
@@ -130,9 +127,10 @@ export function FlippyBirdGame() {
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'flippy-bird');
   const prevScore = useRef(score);
-
   const lastPipeTimeRef = useRef(0);
   const gameOverTriggeredRef = useRef(false);
+  const startTimeRef = useRef<number>(0);
+  const statsUpdatedRef = useRef(false);
 
   useEffect(() => {
     if (score > prevScore.current) {
@@ -147,6 +145,7 @@ export function FlippyBirdGame() {
   // Prépare le jeu pour une nouvelle partie.
   const readyGame = useCallback(() => {
     gameOverTriggeredRef.current = false;
+    statsUpdatedRef.current = false;
     dispatch({ type: 'READY_GAME', payload: { highScore: user?.stats.games["Flippy Bird"].highScore || 0 } });
   }, [user]);
 
@@ -160,6 +159,7 @@ export function FlippyBirdGame() {
       dispatch({ type: 'SET_BIRD_VELOCITY', payload: JUMP_STRENGTH });
     } else if (status === 'ready') {
       lastPipeTimeRef.current = Date.now();
+      startTimeRef.current = Date.now();
       dispatch({ type: 'START_GAME' });
     }
   }, [status]);
@@ -181,12 +181,9 @@ export function FlippyBirdGame() {
         return;
     }
     
-    // Applique la gravité à la vitesse de l'oiseau.
     const newVelocity = birdVelocity + GRAVITY;
-    // Met à jour la position de l'oiseau.
     const newPosition = birdPosition + newVelocity;
 
-    // Déplacement des tuyaux
     let newPipes = pipes.map(pipe => ({ ...pipe, x: pipe.x - PIPE_SPEED })).filter(pipe => pipe.x > -PIPE_WIDTH);
         
     let pipePassed = false;
@@ -197,7 +194,6 @@ export function FlippyBirdGame() {
       }
     });
     
-    // Création des tuyaux
     if (Date.now() - lastPipeTimeRef.current > PIPE_INTERVAL) {
         const minPipeHeight = 80;
         const maxPipeHeight = GAME_HEIGHT - PIPE_GAP - 120;
@@ -206,15 +202,12 @@ export function FlippyBirdGame() {
         lastPipeTimeRef.current = Date.now();
     }
     
-    // Dispatch de l'action de tick
     dispatch({ type: 'GAME_TICK', payload: { newPosition, newVelocity, newPipes, pipePassed }});
 
-    // Vérification des collisions après la mise à jour de l'état
-    // Collision avec les bords supérieur et inférieur.
     if (newPosition < 0 || newPosition > GAME_HEIGHT - BIRD_SIZE) {
         triggerGameOver();
     }
-    // Collision avec les tuyaux.
+
     for (const pipe of newPipes) {
       const birdRight = GAME_WIDTH / 2 + BIRD_SIZE / 2;
       const birdLeft = GAME_WIDTH / 2 - BIRD_SIZE / 2;
@@ -254,16 +247,15 @@ export function FlippyBirdGame() {
   
   // Met à jour les statistiques de l'utilisateur à la fin de la partie.
   useEffect(() => {
-    if (status === 'over' && startTime !== null && user) {
-        const playtimeInSeconds = Math.round((Date.now() - startTime) / 1000);
+    if (status === 'over' && !statsUpdatedRef.current && user) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats("Flippy Bird", {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
-            pipesPassed: score,
         });
+        statsUpdatedRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]); // Ne dépend que de 'status' pour se déclencher une seule fois.
+  }, [status, score, user, updateUserStats]);
 
   // Gère les entrées du clavier et du clic/toucher.
   useEffect(() => {
@@ -287,9 +279,8 @@ export function FlippyBirdGame() {
     };
   }, [status, handleUserAction]);
 
-  // Calcule la rotation de l'oiseau pour un effet visuel.
   const birdRotation = status === 'playing'
-    ? Math.max(-25, Math.min(90, birdVelocity * 4))
+    ? Math.max(-25, Math.min(90, birdVelocity * 6)) // Adjusted for more responsive rotation
     : status === 'over' ? 90 : 0;
 
   // Affiche l'écran d'accueil du jeu.
