@@ -18,7 +18,7 @@ const BIRD_SIZE = 30; // Taille de l'oiseau en pixels.
 const GAME_WIDTH = 400; // Largeur de la zone de jeu.
 const GAME_HEIGHT = 600; // Hauteur de la zone de jeu.
 const GRAVITY = 0.5; // Force de la gravité appliquée à l'oiseau.
-const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau, ajustée pour être moins forte.
+const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
 const PIPE_GAP = 220; // Espace vertical entre les tuyaux.
 const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
@@ -123,9 +123,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             scoreIncremented = true;
         }
       });
-      if(scoreIncremented) {
-          // On ne peut pas appeler un autre dispatch ici, donc on met à jour directement le score.
-      }
 
       let newLastPipeTime = state.lastPipeTime;
       // Crée un nouveau tuyau à intervalle régulier.
@@ -295,7 +292,7 @@ export function FlippyBirdGame() {
 
   // Calcule la rotation de l'oiseau pour un effet visuel.
   const birdRotation = status === 'playing'
-    ? Math.max(-30, Math.min(90, birdVelocity * 8))
+    ? Math.max(-30, Math.min(90, birdVelocity * 5))
     : status === 'over' ? 90 : 0;
 
   // Affiche l'écran d'accueil du jeu.
@@ -416,7 +413,7 @@ export function FlippyBirdGame() {
                     height: BIRD_SIZE,
                     left: (GAME_WIDTH / 2) - (BIRD_SIZE / 2),
                     transform: `translateY(${birdPosition}px) rotate(${birdRotation}deg)`,
-                    transition: status === 'playing' ? 'transform 150ms linear' : 'transform 500ms ease-out',
+                    transition: 'transform 150ms ease-out',
                     fill: 'currentColor',
                 }}
             />
@@ -453,5 +450,3 @@ export function FlippyBirdGame() {
     </div>
   );
 }
-
-    

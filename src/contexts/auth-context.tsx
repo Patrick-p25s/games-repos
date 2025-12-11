@@ -164,11 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Fonction utilitaire pour sauvegarder les feedbacks dans l'état et localStorage.
-  const saveFeedback = useCallback((feedbackToSave: Feedback[]) => {
-      setAllFeedback(currentFeedback => {
-        localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackToSave));
-        return feedbackToSave;
-      });
+  const saveFeedback = useCallback((feedbackData: Feedback[]) => {
+    setAllFeedback(feedbackData);
+    localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackData));
   }, []);
 
   // Fonction de connexion : trouve un utilisateur existant ou en crée un nouveau.
@@ -221,63 +219,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(currentUser => {
         if (!currentUser) return null;
 
-        // 1. Crée une copie profonde de l'utilisateur actuel pour éviter les mutations directes.
         const updatedUser: User = JSON.parse(JSON.stringify(currentUser));
         
-        // 2. Récupère les statistiques existantes pour une lecture facile.
         const gameStats = updatedUser.stats.games[gameName];
         const overallStats = updatedUser.stats.overall;
 
-        // 3. Met à jour les statistiques spécifiques au jeu de manière fiable.
-        gameStats.gamesPlayed += 1;
-        gameStats.highScore = Math.max(gameStats.highScore, newGameStats.highScore || 0);
-        gameStats.totalPlaytime += newGameStats.totalPlaytime || 0;
-        
-        // Gère les statistiques spécifiques à chaque jeu.
+        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
+        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
+        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+
         Object.keys(newGameStats).forEach(key => {
             if (key !== 'highScore' && key !== 'totalPlaytime' && key !== 'gamesPlayed') {
                 const statKey = key as keyof GameStats;
-                (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                 if (typeof (gameStats as any)[statKey] === 'number') {
+                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                }
             }
         });
-        if (gameName === 'Quiz') {
+        if (gameName === 'Quiz' && 'totalCorrect' in newGameStats && 'totalQuestions' in newGameStats) {
             const quizStats = gameStats as User['stats']['games']['Quiz'];
-            const newTotalCorrect = (newGameStats as any).totalCorrect || 0;
-            const newTotalQuestions = (newGameStats as any).totalQuestions || 0;
-            quizStats.totalCorrect += newTotalCorrect;
-            quizStats.totalQuestions += newTotalQuestions;
+            quizStats.totalCorrect = (quizStats.totalCorrect || 0);
+            quizStats.totalQuestions = (quizStats.totalQuestions || 0);
             quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
         }
 
-
-        // 4. Détermine si la partie est une "victoire".
         let isWin = false;
         const score = newGameStats.highScore ?? 0;
-        if (gameName === 'Quiz') {
-            const quizStats = gameStats as User['stats']['games']['Quiz'];
+        if (gameName === 'Quiz' && 'totalQuestions' in newGameStats) {
             const totalQuestions = (newGameStats as any).totalQuestions ?? 0;
             if (totalQuestions > 0) {
               isWin = (score / totalQuestions) >= 0.5;
             }
         } else if (score > 0) {
-            isWin = true; // Pour les autres jeux, un score > 0 est une victoire.
+            isWin = true;
         }
         
-        // 5. Met à jour les statistiques globales de manière fiable.
         overallStats.totalGames = (overallStats.totalGames || 0) + 1;
         if (isWin) {
             overallStats.totalWins = (overallStats.totalWins || 0) + 1;
         }
         
-        // Calcule le nouveau taux de victoire.
         overallStats.winRate = overallStats.totalGames > 0 
             ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100)
             : 0;
 
-        // Calcule le nouveau temps de jeu total.
         overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
 
-        // Recalcule le jeu favori.
         let favoriteGame = "N/A";
         let maxPlaytime = -1;
         for (const [game, data] of Object.entries(updatedUser.stats.games)) {
@@ -288,11 +275,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         overallStats.favoriteGame = favoriteGame;
 
-        // 6. Sauvegarde l'objet utilisateur complet et mis à jour.
         saveUser(updatedUser);
         return updatedUser;
     });
-}, [saveUser]);
+  }, [saveUser]);
   
   // Réinitialise toutes les statistiques de l'utilisateur.
   const resetStats = useCallback(() => {
@@ -309,15 +295,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Soumet un nouveau feedback.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
-    const newFeedback: Feedback = {
-        ...feedbackData,
-        id: Date.now(),
-        date: new Date().toLocaleDateString('en-CA'),
-        userId: user.id
-    };
-    const updatedFeedback = [...allFeedback, newFeedback];
-    saveFeedback(updatedFeedback);
-  }, [user, allFeedback, saveFeedback]);
+    setAllFeedback(currentFeedback => {
+        const newFeedback: Feedback = {
+            ...feedbackData,
+            id: Date.now(),
+            date: new Date().toLocaleDateString('en-CA'),
+            userId: user.id
+        };
+        const updatedFeedback = [...currentFeedback, newFeedback];
+        localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(updatedFeedback));
+        return updatedFeedback;
+    });
+  }, [user]);
 
   // Supprime un feedback.
   const deleteFeedback = useCallback((feedbackId: number) => {
