@@ -98,8 +98,6 @@ const defaultStats: User['stats'] = {
   }
 };
 
-const hasUpdatedStatsThisSession: { [game: string]: boolean } = {};
-
 
 // Le composant AuthProvider enveloppe l'application et fournit le contexte d'authentification.
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -107,41 +105,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [viewCount, setViewCount] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Au montage initial, charge toutes les données depuis localStorage.
+  // Au montage initial, charge toutes les données depuis localStorage, CÔTÉ CLIENT UNIQUEMENT.
   useEffect(() => {
-    try {
-      const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
-      if (storedAllUsers) {
-        // Assure l'intégrité des données au chargement
-        const parsedUsers: User[] = JSON.parse(storedAllUsers);
-        parsedUsers.forEach(u => {
-          if (!u.inbox) u.inbox = [];
-          if (!u.stats) u.stats = JSON.parse(JSON.stringify(defaultStats));
-          if (u.stats.overall.totalWins === undefined) u.stats.overall.totalWins = 0;
-        });
-        setAllUsers(parsedUsers);
+    // Ce code ne s'exécute que dans le navigateur
+    if (typeof window !== 'undefined') {
+      try {
+        const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
+        if (storedAllUsers) {
+          const parsedUsers: User[] = JSON.parse(storedAllUsers);
+          parsedUsers.forEach(u => {
+            if (!u.inbox) u.inbox = [];
+            if (!u.stats) u.stats = JSON.parse(JSON.stringify(defaultStats));
+          });
+          setAllUsers(parsedUsers);
+        }
+
+        const storedUser = localStorage.getItem("nextgen-games-user");
+        if (storedUser) {
+          const parsedUser: User = JSON.parse(storedUser);
+          if (!parsedUser.inbox) parsedUser.inbox = [];
+          if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
+          setUser(parsedUser);
+        }
+
+        const storedAllFeedback = localStorage.getItem("nextgen-games-allFeedback");
+        if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
+
+        const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
+        setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
+        
+      } catch (error) {
+        console.error("Échec de l'analyse des données depuis localStorage", error);
+        localStorage.clear();
       }
-
-      const storedUser = localStorage.getItem("nextgen-games-user");
-      if (storedUser) {
-        const parsedUser: User = JSON.parse(storedUser);
-        if (!parsedUser.inbox) parsedUser.inbox = [];
-        if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
-        if (parsedUser.stats.overall.totalWins === undefined) parsedUser.stats.overall.totalWins = 0;
-        setUser(parsedUser);
-      }
-
-      const storedAllFeedback = localStorage.getItem("nextgen-games-allFeedback");
-      if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
-
-      const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-      setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
-      
-    } catch (error) {
-      console.error("Échec de l'analyse des données depuis localStorage", error);
-      // En cas d'erreur de lecture, on efface tout pour repartir sur une base saine.
-      localStorage.clear();
+      setIsLoaded(true); // Marque le chargement comme terminé
     }
   }, []);
 
@@ -191,10 +190,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           inbox: [],
         };
     } else {
-        // S'assure que les anciens utilisateurs ont les nouvelles structures de données
         if (!loggedInUser.inbox) loggedInUser.inbox = [];
         if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
-        if (loggedInUser.stats.overall.totalWins === undefined) loggedInUser.stats.overall.totalWins = 0;
     }
     
     saveUser(loggedInUser);
@@ -222,7 +219,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(currentUser => {
         if (!currentUser) return null;
 
-        // Create a deep copy to avoid mutation issues
         const updatedUser: User = JSON.parse(JSON.stringify(currentUser));
         
         const gameStats = updatedUser.stats.games[gameName];
@@ -230,9 +226,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
         gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+        gameStats.totalPlaytime += newGameStats.totalPlaytime || 0;
 
-        // Handle specific game stats
         Object.keys(newGameStats).forEach(key => {
             if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
                 const statKey = key as keyof GameStats;
@@ -249,18 +244,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
         }
 
-        // Determine if the game was a "win"
         let isWin = false;
         const score = newGameStats.highScore ?? 0;
-        if (gameName === 'Quiz' && 'totalQuestions' in newGameStats) {
-             const totalQuestions = (newGameStats as any).totalQuestions ?? 0;
-             if(totalQuestions > 0) isWin = (score / totalQuestions) >= 0.5;
+        if (gameName === 'Quiz') {
+             if(score > 0) isWin = true;
         } else if (score > 0) {
              isWin = true;
         }
 
-        // Update overall stats
-        overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+        overallStats.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
         if (isWin) {
             overallStats.totalWins = (overallStats.totalWins || 0) + 1;
         }
@@ -322,22 +314,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date: new Date().toLocaleDateString('en-CA'),
     };
     
-    // Utilise la forme fonctionnelle de setState pour garantir une mise à jour atomique.
     setAllUsers(currentUsers => {
         const updatedUsers = currentUsers.map(u => {
             if (u.id === userId) {
-                // S'assure que 'inbox' est un tableau avant d'y ajouter des éléments.
                 const newInbox = u.inbox ? [newInboxMessage, ...u.inbox] : [newInboxMessage];
                 return { ...u, inbox: newInbox };
             }
             return u;
         });
         
-        // Sauvegarde la liste complète des utilisateurs mise à jour.
         localStorage.setItem("nextgen-games-allUsers", JSON.stringify(updatedUsers));
         
-        // Si l'utilisateur qui reçoit la réponse est celui qui est connecté,
-        // met à jour son état local pour un affichage immédiat.
         if (user && user.id === userId) {
             const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
             if (updatedLoggedInUser) {
@@ -379,6 +366,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
     sendReply, viewCount, incrementViewCount, deleteMessage
   };
+  
+  if (!isLoaded) {
+    return null; // ou un spinner de chargement si vous préférez
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>
