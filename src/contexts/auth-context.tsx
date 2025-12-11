@@ -285,7 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const incrementViewCount = () => {
     try {
       const currentCount = localStorage.getItem("nextgen-games-viewCount");
-      const newCount = (currentCount ? JSON.parse(currentCount) : 0) + 1;
+      const newCount = (currentCount ? parseInt(JSON.parse(currentCount)) : 0) + 1;
       localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
       setViewCount(newCount);
     } catch (error) {
