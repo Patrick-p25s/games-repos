@@ -1,0 +1,139 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership security model combined with
+ * read-only access for public game content. The primary goal is to ensure that users can only
+ * access and modify their own data, preventing any user from reading or writing another user's
+ * information.
+ *
+ * Data Structure: The data is organized into top-level collections. User-specific data, such
+ * as profiles, scores, and quiz history, is nested under the `/users/{userId}` path. This
+ * creates a clear and secure data boundary for each user. Public data, like game definitions
+ * and quiz questions, resides in separate top-level collections (`/games`, `/quiz_questions`).
+ *
+ * Key Security Decisions:
+ * - User Enumeration is Disallowed: Listing the top-level `/users` collection is explicitly
+ *   forbidden to protect user privacy.
+ * - Strict Ownership: All subcollections under `/users/{userId}` (e.g., `scores`, `quiz_history`)
+ *   are only accessible by the user identified in the path's `userId`. This is enforced
+ *   efficiently using path-based security.
+ * - Public Read-Only Content: The `/games` and `/quiz_questions` collections are publicly
+ *   readable by anyone, including unauthenticated users, but cannot be modified by clients.
+ *   This ensures game content is managed securely through a backend process or the console.
+ * - Default Deny: Any operation not explicitly granted is denied.
+ *
+ * Denormalization for Authorization: The rules rely on path-based security. User-specific
+ * collections like `/users/{userId}/scores` inherently link a score to a user via the path,
+ * avoiding the need for extra `get()` calls to check ownership. Additionally, on document
+ * creation, we validate that the internal `userId` field matches the `userId` in the path to
+ * ensure data integrity from the start.
+ *
+ * Structural Segregation: Private user data is strictly separated from public game data by
+ * placing them in different top-level collections. This simplifies rule logic, improves query
+ * performance, and prevents accidental data leakage. For example, a query for public games
+ * can never accidentally return private user data.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for reusable logic
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks if the requesting user's UID matches the document's owner ID.
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Checks for ownership on an existing document. Used for update and delete.
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // Validates that the user ID in the path matches the user ID in a newly created document.
+    function isCreatingOwnDocument(userId) {
+      return isOwner(userId) && request.resource.data.userId == userId;
+    }
+
+    /**
+     * @description Controls access to user profile documents.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document. `auth.uid` must match `{userId}`.
+     * @allow (get) An authenticated user reading their own profile.
+     * @deny (list) Any user, authenticated or not, attempting to list all user profiles.
+     * @deny (update) A user trying to update another user's profile.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Controls access to a user's scores.
+       * @path /users/{userId}/scores/{scoreId}
+       * @allow (create) An authenticated user creating a score for themselves.
+       * @allow (list) An authenticated user listing their own scores.
+       * @deny (get) A user trying to read another user's specific score.
+       * @deny (update) A user trying to modify another user's score.
+       * @principle Enforces strict data ownership for nested user-specific collections.
+       */
+      match /scores/{scoreId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isCreatingOwnDocument(userId);
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Controls access to a user's quiz history.
+       * @path /users/{userId}/quiz_history/{userQuizHistoryId}
+       * @allow (create) An authenticated user creating a quiz history entry for themselves.
+       * @allow (list) An authenticated user listing their own quiz history.
+       * @deny (get) A user trying to read another user's quiz history.
+       * @deny (delete) A user trying to delete another user's quiz history entry.
+       * @principle Enforces strict data ownership for nested user-specific collections.
+       */
+      match /quiz_history/{userQuizHistoryId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isCreatingOwnDocument(userId);
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Defines access rules for the public collection of games.
+     * @path /games/{gameId}
+     * @allow (get) Any user, including unauthenticated ones, reading a game's details.
+     * @allow (list) Any user, including unauthenticated ones, listing all available games.
+     * @deny (create) Any client trying to add a new game.
+     * @deny (update) Any client trying to modify an existing game.
+     * @principle Establishes a public, read-only collection for shared application content.
+     */
+    match /games/{gameId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Defines access rules for the public collection of quiz questions.
+     * @path /quiz_questions/{quizQuestionId}
+     * @allow (get) Any user, including unauthenticated ones, reading a quiz question.
+     * @allow (list) Any user, including unauthenticated ones, listing all quiz questions.
+     * @deny (create) Any client trying to add a new quiz question.
+     * @deny (update) Any client trying to modify an existing quiz question.
+     * @principle Establishes a public, read-only collection for shared application content.
+     */
+    match /quiz_questions/{quizQuestionId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,279 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Tri-Lingua Games application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's username."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "preferredLanguage": {
+          "type": "string",
+          "description": "The user's preferred language (e.g., 'en', 'fr', 'es')."
+        },
+        "themePreference": {
+          "type": "string",
+          "description": "The user's preferred theme (e.g., 'light', 'dark')."
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "preferredLanguage",
+        "themePreference"
+      ]
+    },
+    "Game": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Game",
+      "type": "object",
+      "description": "Represents a game available in the Tri-Lingua Games application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Game entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the game."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the game."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "Score": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Score",
+      "type": "object",
+      "description": "Represents a user's score for a specific game.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Score entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Score)"
+        },
+        "gameId": {
+          "type": "string",
+          "description": "Reference to Game. (Relationship: Game 1:N Score)"
+        },
+        "score": {
+          "type": "number",
+          "description": "The user's score for the game."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The timestamp when the score was achieved.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "gameId",
+        "score",
+        "timestamp"
+      ]
+    },
+    "QuizQuestion": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "QuizQuestion",
+      "type": "object",
+      "description": "Represents a quiz question.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the QuizQuestion entity."
+        },
+        "questionText": {
+          "type": "string",
+          "description": "The text of the quiz question."
+        },
+        "correctAnswer": {
+          "type": "string",
+          "description": "The correct answer to the quiz question."
+        },
+        "incorrectAnswers": {
+          "type": "array",
+          "description": "Array of incorrect answer options for the quiz question.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "topic": {
+          "type": "string",
+          "description": "The topic of the quiz question."
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "The difficulty level of the quiz question (e.g., 'easy', 'medium', 'hard')."
+        }
+      },
+      "required": [
+        "id",
+        "questionText",
+        "correctAnswer",
+        "incorrectAnswers",
+        "topic",
+        "difficulty"
+      ]
+    },
+    "UserQuizHistory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserQuizHistory",
+      "type": "object",
+      "description": "Represents a user's quiz history and performance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserQuizHistory entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N UserQuizHistory)"
+        },
+        "quizQuestionId": {
+          "type": "string",
+          "description": "Reference to QuizQuestion. (Relationship: QuizQuestion 1:N UserQuizHistory)"
+        },
+        "isCorrect": {
+          "type": "boolean",
+          "description": "Indicates whether the user answered the question correctly."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The timestamp when the user answered the quiz question.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "quizQuestionId",
+        "isCorrect",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. Uses path-based ownership: only the user (or an admin) can read/write their own profile.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/games/{gameId}",
+        "definition": {
+          "entityName": "Game",
+          "schema": {
+            "$ref": "#/backend/entities/Game"
+          },
+          "description": "Stores information about available games. Publicly readable.",
+          "params": [
+            {
+              "name": "gameId",
+              "description": "The unique identifier of the game."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/scores/{scoreId}",
+        "definition": {
+          "entityName": "Score",
+          "schema": {
+            "$ref": "#/backend/entities/Score"
+          },
+          "description": "Stores user scores for each game. Uses path-based ownership: only the user (or an admin) can read/write their own scores.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "scoreId",
+              "description": "The unique identifier of the score."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/quiz_questions/{quizQuestionId}",
+        "definition": {
+          "entityName": "QuizQuestion",
+          "schema": {
+            "$ref": "#/backend/entities/QuizQuestion"
+          },
+          "description": "Stores quiz questions. Publicly readable.",
+          "params": [
+            {
+              "name": "quizQuestionId",
+              "description": "The unique identifier of the quiz question."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/quiz_history/{userQuizHistoryId}",
+        "definition": {
+          "entityName": "UserQuizHistory",
+          "schema": {
+            "$ref": "#/backend/entities/UserQuizHistory"
+          },
+          "description": "Stores the user's quiz history. Uses path-based ownership: only the user (or an admin) can read/write their own quiz history.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "userQuizHistoryId",
+              "description": "The unique identifier of the user quiz history entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the Tri-Lingua Games application, focusing on user data, game information, scores, quiz questions, and user quiz history. The structure emphasizes Authorization Independence by avoiding hierarchical authorization dependencies and denormalizing authorization data where necessary. It leverages Structural Segregation to maintain a homogeneous security posture within collections. Access Modeling uses path-based ownership for user-specific data and relies on simple existence checks for global roles. Data Clarity and Predictability are enhanced by using explicit state modeling and consistent naming conventions.\n\n**Authorization Independence:**\n\n*   User-owned data (scores, quiz history) is stored under the `/users/{userId}` path, ensuring that access control can be enforced based solely on the authenticated user's ID (`request.auth.uid`) without needing to read parent documents.\n\n**Structural Segregation:**\n\n*   Each top-level collection (e.g., `users`, `games`, `quiz_questions`) contains documents with similar access requirements. This simplifies security rules, as a single rule can apply to all documents within a collection.\n\n**Access Modeling:**\n\n*   **Private Data:** User profiles are stored at `/users/{userId}`, using path-based ownership. This is highly secure and efficient for user-centric data.\n*   **Hierarchical Paths for User-Owned Data:** Scores and quiz history are stored under the user's document, such as `/users/{userId}/scores/{scoreId}` and `/users/{userId}/quiz_history/{historyId}`, establishing clear ownership.\n\n**QAPs (Rules are not Filters):**\n\n*   The structure facilitates secure `list` operations (QAPs) by ensuring that rules do not need to filter data. For example, listing scores under a specific user (`/users/{userId}/scores`) can be done securely because only the authenticated user (or an admin) can access that data. Segregation (separation of concerns) ensures listing is only allowed on particular collections that match authorization."
+  }
+}
