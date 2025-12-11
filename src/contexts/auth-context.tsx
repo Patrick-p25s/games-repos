@@ -28,6 +28,7 @@ export type User = {
   stats: {
     overall: {
       totalGames: number;
+      totalWins: number;
       favoriteGame: string;
       winRate: number; // Pas implémenté actuellement, mais présent pour une utilisation future.
       totalPlaytime: number; // Stocké en secondes pour la précision
@@ -37,8 +38,8 @@ export type User = {
       Tetris: GameStats & { linesCleared: number };
       Snake: GameStats & { applesEaten: number };
       "Flippy Bird": GameStats & { pipesPassed: number };
-      Memory: GameStats & { bestTime: number; score: number }; // en secondes
-      Puzzle: GameStats & { bestTime: number; score: number }; // en secondes
+      Memory: GameStats & { bestTime: number }; // en secondes
+      Puzzle: GameStats & { bestTime: number }; // en secondes
     }
   },
   inbox: InboxMessage[];
@@ -81,6 +82,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const defaultStats: User['stats'] = {
   overall: {
     totalGames: 0,
+    totalWins: 0,
     favoriteGame: "N/A",
     winRate: 0,
     totalPlaytime: 0,
@@ -90,8 +92,8 @@ const defaultStats: User['stats'] = {
     Tetris: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, linesCleared: 0 },
     Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 0 },
     "Flippy Bird": { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, pipesPassed: 0 },
-    Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0, score: 0 },
-    Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0, score: 0 },
+    Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
+    Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
   }
 };
 
@@ -112,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         parsedUsers.forEach(u => {
           if (!u.inbox) u.inbox = [];
           if (!u.stats) u.stats = JSON.parse(JSON.stringify(defaultStats));
+          if (u.stats.overall.totalWins === undefined) u.stats.overall.totalWins = 0;
         });
         setAllUsers(parsedUsers);
       }
@@ -121,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser: User = JSON.parse(storedUser);
         if (!parsedUser.inbox) parsedUser.inbox = [];
         if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
+        if (parsedUser.stats.overall.totalWins === undefined) parsedUser.stats.overall.totalWins = 0;
         setUser(parsedUser);
       }
 
@@ -194,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // S'assure que les anciens utilisateurs ont les nouvelles structures de données
         if (!loggedInUser.inbox) loggedInUser.inbox = [];
         if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
+        if (loggedInUser.stats.overall.totalWins === undefined) loggedInUser.stats.overall.totalWins = 0;
     }
     
     saveUser(loggedInUser);
@@ -217,33 +222,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveUser]);
   
   // Met à jour les statistiques d'un jeu pour l'utilisateur.
-  const updateUserStats = useCallback((game: keyof User['stats']['games'], newStats: Partial<GameStats>) => {
+  const updateUserStats = useCallback((gameName: keyof User['stats']['games'], gameStats: Partial<GameStats>) => {
     setUser(currentUser => {
-      if (!currentUser) return null;
-      
-      const updatedUser = JSON.parse(JSON.stringify(currentUser)) as User;
+        if (!currentUser) return null;
 
-      // Met à jour les statistiques spécifiques du jeu
-      Object.assign(updatedUser.stats.games[game], newStats);
-      
-      // Recalcule les statistiques globales
-      updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
-      
-      updatedUser.stats.overall.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
-      
-      // Recalcule le jeu favori en se basant sur le temps de jeu le plus élevé.
-      let favoriteGame = "N/A";
-      let maxPlaytime = -1;
-      for (const [gameName, gameData] of Object.entries(updatedUser.stats.games)) {
-          if (gameData.totalPlaytime > maxPlaytime) {
-              maxPlaytime = gameData.totalPlaytime;
-              favoriteGame = gameName;
-          }
-      }
-      updatedUser.stats.overall.favoriteGame = favoriteGame;
+        const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(currentUser.stats)) };
+        
+        // S'assurer que les structures existent
+        if (!updatedUser.stats.games[gameName]) {
+            updatedUser.stats.games[gameName] = JSON.parse(JSON.stringify(defaultStats.games[gameName]));
+        }
+        if (!updatedUser.stats.overall) {
+            updatedUser.stats.overall = JSON.parse(JSON.stringify(defaultStats.overall));
+        }
+         if (updatedUser.stats.overall.totalWins === undefined) {
+            updatedUser.stats.overall.totalWins = 0;
+        }
 
-      saveUser(updatedUser);
-      return updatedUser;
+        // Mettre à jour les stats spécifiques au jeu
+        Object.assign(updatedUser.stats.games[gameName], gameStats);
+
+        // Déterminer si la partie est une victoire
+        let isWin = false;
+        const score = gameStats.highScore ?? 0;
+        const questions = (updatedUser.stats.games['Quiz'] as any).totalQuestions ?? 0;
+        
+        if (gameName === 'Quiz' && questions > 0) {
+            isWin = (score / questions) >= 0.5;
+        } else if (score > 0) {
+            isWin = true;
+        }
+
+        // Mettre à jour les stats globales
+        updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
+        if (isWin) {
+            updatedUser.stats.overall.totalWins += 1;
+        }
+        
+        if (updatedUser.stats.overall.totalGames > 0) {
+            updatedUser.stats.overall.winRate = Math.round((updatedUser.stats.overall.totalWins / updatedUser.stats.overall.totalGames) * 100);
+        } else {
+            updatedUser.stats.overall.winRate = 0;
+        }
+        
+        updatedUser.stats.overall.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+
+        // Recalculer le jeu favori
+        let favoriteGame = "N/A";
+        let maxPlaytime = -1;
+        for (const [game, data] of Object.entries(updatedUser.stats.games)) {
+            if (data.totalPlaytime > maxPlaytime) {
+                maxPlaytime = data.totalPlaytime;
+                favoriteGame = game;
+            }
+        }
+        updatedUser.stats.overall.favoriteGame = favoriteGame;
+
+        saveUser(updatedUser);
+        return updatedUser;
     });
   }, [saveUser]);
   
@@ -259,10 +295,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [saveUser]);
   
-  // Soumet un nouveau feedback de manière atomique.
+  // Soumet un nouveau feedback.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
-
     setAllFeedback(currentFeedback => {
         const newFeedback: Feedback = {
             ...feedbackData,
@@ -275,7 +310,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return updatedFeedback;
     });
   }, [user, saveFeedback]);
-
 
   // Supprime un feedback.
   const deleteFeedback = useCallback((feedbackId: number) => {
@@ -332,19 +366,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Incrémente le compteur de vues de l'application une seule fois par session.
   const incrementViewCount = useCallback(() => {
-    const hasIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
-    if (!hasIncremented) {
-        setViewCount(currentCount => {
-            const newCount = currentCount + 1;
-            try {
-                localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-                sessionStorage.setItem("nextgen-games-view-incremented", "true");
-            } catch (error) {
-                console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
-            }
-            return newCount;
-        });
-    }
+    setViewCount(currentCount => {
+        const newCount = currentCount + 1;
+        try {
+            localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+        } catch (error) {
+            console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
+        }
+        return newCount;
+    });
   }, []);
 
   const isLoggedIn = !!user;
