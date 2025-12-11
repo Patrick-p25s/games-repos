@@ -216,10 +216,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   // Met à jour les statistiques d'un jeu pour l'utilisateur.
   const updateUserStats = useCallback((gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
-      if (!user) return;
+    setUser(currentUser => {
+      if (!currentUser) return null;
 
       // 1. Crée une copie profonde de l'utilisateur actuel pour éviter les mutations directes.
-      const updatedUser: User = JSON.parse(JSON.stringify(user));
+      const updatedUser: User = JSON.parse(JSON.stringify(currentUser));
 
       // 2. Récupère les statistiques existantes pour une lecture facile.
       const gameStats = updatedUser.stats.games[gameName];
@@ -240,8 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const score = newGameStats.highScore ?? 0;
       if (gameName === 'Quiz') {
           const quizStats = gameStats as User['stats']['games']['Quiz'];
-          if (quizStats.totalQuestions > 0) {
-              isWin = (score / quizStats.totalQuestions) >= 0.5;
+          if (newGameStats.totalQuestions && newGameStats.totalQuestions > 0) {
+            isWin = (score / newGameStats.totalQuestions) >= 0.5;
           }
       } else if (score > 0) {
           isWin = true; // Pour les autres jeux, un score > 0 est une victoire.
@@ -274,8 +275,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 6. Sauvegarde l'objet utilisateur complet et mis à jour.
       saveUser(updatedUser);
-
-  }, [user, saveUser]);
+      return updatedUser;
+    });
+  }, [saveUser]);
   
   // Réinitialise toutes les statistiques de l'utilisateur.
   const resetStats = useCallback(() => {
