@@ -105,10 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // On initial mount, load all data from localStorage.
   useEffect(() => {
     try {
-      // Clear all data on first load for a fresh start
-      if (typeof window !== 'undefined') {
-          // localStorage.clear();
-      }
+      // The line below can be uncommented to clear all data on first load for a fresh start
+      // if (typeof window !== 'undefined') { localStorage.clear(); }
 
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
       if (storedAllUsers) {
@@ -266,6 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [saveUser]);
   
+  // FIX: Simplified submitFeedback to prevent duplicates.
   const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user) return;
     const newFeedback: Feedback = {
@@ -274,12 +273,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       date: new Date().toLocaleDateString('en-CA'),
       userId: user.id
     };
-    setAllFeedback(currentFeedback => {
-        const updatedFeedback = [...currentFeedback, newFeedback];
-        saveFeedback(updatedFeedback);
-        return updatedFeedback;
-    });
-  }, [user, saveFeedback]);
+    const updatedFeedback = [...allFeedback, newFeedback];
+    saveFeedback(updatedFeedback);
+  }, [user, allFeedback, saveFeedback]);
 
   const deleteFeedback = useCallback((feedbackId: number) => {
     const feedbackToDelete = allFeedback.find(f => f.id === feedbackId);
@@ -297,50 +293,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         message,
         date: new Date().toLocaleDateString('en-CA'),
     };
-
+    
+    // Create a new array of users with the updated inbox for the target user.
     const updatedUsers = allUsers.map(u => {
         if (u.id === userId) {
-            const updatedUser = {
+            // Create a new user object with a new inbox array.
+            return {
                 ...u,
                 inbox: [newInboxMessage, ...(u.inbox || [])],
             };
-            return updatedUser;
         }
         return u;
     });
 
+    // Save the entire updated list of users.
     saveAllUsers(updatedUsers);
 
     // If the person being replied to is the currently logged-in user,
-    // update their state directly so the change is reflected immediately.
-    if (user?.id === userId) {
-        setUser(prevUser => prevUser ? { ...prevUser, inbox: [newInboxMessage, ...(prevUser.inbox || [])] } : null);
+    // we need to update their local state as well so they see the message instantly.
+    if (user && user.id === userId) {
+        setUser(prevUser => {
+            if (!prevUser) return null;
+            return {
+                ...prevUser,
+                inbox: [newInboxMessage, ...(prevUser.inbox || [])]
+            };
+        });
     }
-  }, [allUsers, user, saveAllUsers]);
+  }, [allUsers, user, saveAllUsers, setUser]);
 
   const deleteMessage = useCallback((messageId: string) => {
     if (!user) return;
-
+    
+    // Create a new user object with the filtered inbox.
     const updatedUser = {
       ...user,
       inbox: user.inbox.filter(msg => msg.id !== messageId)
     };
-
+    
+    // Save the updated user object, which will persist the changes.
     saveUser(updatedUser);
   }, [user, saveUser]);
 
   const incrementViewCount = useCallback(() => {
     try {
-      // Use a function to ensure we're updating from the latest state.
-      setViewCount(currentCount => {
-        const newCount = currentCount + 1;
-        localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-        return newCount;
-      });
+      const newCount = viewCount + 1;
+      localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+      setViewCount(newCount);
     } catch (error) {
       console.error("Failed to update view count in localStorage", error);
     }
-  }, []);
+  }, [viewCount]);
 
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
