@@ -135,5 +135,18 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    /**
+     * @description Defines access rules for application-wide statistics.
+     * @path /app-stats/{statId}
+     * @allow (get, list) Any client can read app statistics.
+     * @allow (create, update) Any client can update statistics (e.g., increment view counter).
+     * @principle Allows public read and write for general app stats like view counters.
+     *             Write operations should be secured by application logic (e.g., transactions).
+     */
+    match /app-stats/{statId} {
+      allow get, list, create, update: if true;
+      allow delete: if false;
+    }
   }
 }
