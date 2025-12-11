@@ -44,10 +44,10 @@ export function UserStats() {
     // Récupère une statistique de jeu en toute sécurité, en retournant une valeur par défaut si elle n'existe pas.
     const getSafeStat = (game: string, stat: string, defaultValue: string | number = 0) => {
         const gameData = stats.games[game as keyof typeof stats.games];
-        if (!gameData || !(stat in gameData)) {
+        if (!gameData || !(stat in gameData) || gameData[stat as keyof typeof gameData] === undefined) {
             return defaultValue;
         }
-        return gameData[stat as keyof typeof gameData] || defaultValue;
+        return gameData[stat as keyof typeof gameData];
     }
     
     // Convertit le temps de jeu total de secondes en une chaîne lisible.
@@ -82,13 +82,13 @@ export function UserStats() {
         { name: "Memory", stats: [
             { title: "gamesPlayed", value: getSafeStat("Memory", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Memory", "highScore") as number).toLocaleString() },
-            { title: "bestTime", value: `${getSafeStat("Memory", "bestTime")}s` },
+            { title: "bestTime", value: `${getSafeStat("Memory", "bestTime", "N/A")}s` },
             { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Memory", "totalPlaytime") as number) },
         ]},
         { name: "Puzzle", stats: [
             { title: "gamesPlayed", value: getSafeStat("Puzzle", "gamesPlayed") },
             { title: "highScore", value: (getSafeStat("Puzzle", "highScore") as number).toLocaleString() },
-            { title: "bestTime", value: `${getSafeStat("Puzzle", "bestTime")}s` },
+            { title: "bestTime", value: `${getSafeStat("Puzzle", "bestTime", "N/A")}s` },
             { title: "totalPlaytime", value: formatPlaytime(getSafeStat("Puzzle", "totalPlaytime") as number) },
         ]},
     ];
