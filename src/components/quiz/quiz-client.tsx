@@ -3,7 +3,6 @@
 
 import { generateQuizQuestions } from "@/ai/flows/generate-quiz-questions";
 import type { GenerateQuizQuestionsOutput } from "@/ai/flows/generate-quiz-questions";
-import { tailorQuizDifficulty } from "@/ai/flows/tailor-quiz-difficulty";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -58,15 +57,12 @@ export function QuizClient() {
     setStatsUpdated(false);
 
     try {
-      const playerHistory = user ? `Player has previously scored ${user.stats.games.Quiz.highScore}/${user.stats.games.Quiz.totalQuestions} on various topics.` : "New player.";
-      const { topic, difficulty } = await tailorQuizDifficulty({ playerHistory });
-      
-      toast({ title: t('letsTryQuiz'), description: `${t('topic')}: ${topic} (${t(difficulty)})` });
+      toast({ title: t('letsTryQuiz'), description: `${t('topic')}: General Knowledge` });
 
       const quizData = await generateQuizQuestions({
-        topic: topic,
-        difficulty: difficulty as "easy" | "medium" | "hard",
-        numQuestions: 15,
+        topic: "General Knowledge",
+        difficulty: "easy",
+        numQuestions: 10,
       });
 
       setQuestions(quizData.questions);
@@ -79,9 +75,9 @@ export function QuizClient() {
         title: t('error'),
         description: t('quizGenerationError'),
       });
-      setQuizState("finished");
+      setQuizState("lobby");
     }
-  }, [t, toast, user]);
+  }, [t, toast]);
 
   const handleNextQuestion = () => {
     if (selectedAnswer === null) {
@@ -129,7 +125,7 @@ export function QuizClient() {
         setStatsUpdated(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quizState, questions, score, startTime, statsUpdated]);
+  }, [quizState, questions, score, startTime, statsUpdated, user, updateUserStats]);
 
   if (quizState === "lobby") {
     return (
@@ -140,7 +136,7 @@ export function QuizClient() {
               <Image 
                 src={gameImage.imageUrl} 
                 alt={t('quiz')} 
-                layout="fill" 
+                fill
                 className="rounded-t-lg object-cover"
                 data-ai-hint={gameImage.imageHint}
               />
@@ -189,7 +185,7 @@ export function QuizClient() {
                 </CardHeader>
                 <CardContent>
                     <h3 className="text-xl font-bold mb-4">{t('yourAnswers')}</h3>
-                    <div className="space-y-4 text-left">
+                    <div className="space-y-4 text-left max-h-96 overflow-y-auto p-2">
                         {questions.map((q, index) => (
                             <div key={index} className="p-4 border rounded-lg bg-muted/50">
                                 <p className="font-semibold">{index + 1}. {q.question}</p>
@@ -271,5 +267,3 @@ export function QuizClient() {
     </div>
   );
 }
-
-    
