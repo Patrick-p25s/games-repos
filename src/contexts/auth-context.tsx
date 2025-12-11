@@ -30,15 +30,15 @@ export type User = {
       totalGames: number;
       favoriteGame: string;
       winRate: number; // Pas implémenté actuellement, mais présent pour une utilisation future.
-      totalPlaytime: string; // ex: '5h 30m'
+      totalPlaytime: number; // Stocké en secondes pour la précision
     },
     games: {
       Quiz: GameStats & { avgAccuracy: number, totalCorrect: number, totalQuestions: number };
       Tetris: GameStats & { linesCleared: number };
       Snake: GameStats & { applesEaten: number };
       "Flippy Bird": GameStats & { pipesPassed: number };
-      Memory: GameStats & { bestTime: number }; // en secondes
-      Puzzle: GameStats & { bestTime: number }; // en secondes
+      Memory: GameStats & { bestTime: number, score: number }; // en secondes
+      Puzzle: GameStats & { bestTime: number, score: number }; // en secondes
     }
   },
   inbox: InboxMessage[];
@@ -83,15 +83,15 @@ const defaultStats: User['stats'] = {
     totalGames: 0,
     favoriteGame: "N/A",
     winRate: 0,
-    totalPlaytime: "0m",
+    totalPlaytime: 0,
   },
   games: {
     Quiz: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, avgAccuracy: 0, totalCorrect: 0, totalQuestions: 0 },
     Tetris: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, linesCleared: 0 },
     Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 0 },
     "Flippy Bird": { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, pipesPassed: 0 },
-    Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
-    Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
+    Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0, score: 0 },
+    Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0, score: 0 },
   }
 };
 
@@ -232,10 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Recalcule les statistiques globales
       updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
       
-      const totalSeconds = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      updatedUser.stats.overall.totalPlaytime = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+      updatedUser.stats.overall.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
       
       // Recalcule le jeu favori en se basant sur le temps de jeu le plus élevé.
       let favoriteGame = "N/A";
@@ -274,7 +271,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       date: new Date().toLocaleDateString('en-CA'),
       userId: user.id
     };
-    // Utilise une fonction de mise à jour pour éviter les problèmes de concurrence
+    
+    // Utilise une fonction de mise à jour pour garantir l'atomicité et éviter les race conditions.
     setAllFeedback(currentFeedback => {
         const updatedFeedback = [...currentFeedback, newFeedback];
         saveFeedback(updatedFeedback);
@@ -300,9 +298,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Met à jour la liste complète des utilisateurs
     const updatedUsers = allUsers.map(u => {
         if (u.id === userId) {
-            const updatedUser = { ...u };
-            updatedUser.inbox = [newInboxMessage, ...(updatedUser.inbox || [])];
-            return updatedUser;
+            const updatedUserInbox = [newInboxMessage, ...(u.inbox || [])];
+            return { ...u, inbox: updatedUserInbox };
         }
         return u;
     });
@@ -360,7 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
+    throw new Error("useAuth doit être utilisé à l'intérieur d'un AuthProvider");
   }
   return context;
 }
