@@ -116,7 +116,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function QuizClient() {
-  const { t } = useLocale();
+  const { t, language } = useLocale();
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, startTime, statsUpdated } = state;
@@ -124,17 +124,18 @@ export function QuizClient() {
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
   const { toast } = useToast();
 
-  // This function now loads questions from the static data file.
+  // This function now loads questions from the static data file based on language.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
 
     // Simulate a brief loading period for a better user experience.
     setTimeout(() => {
-      const shuffledQuestions = shuffleArray(staticQuizData).slice(0, 10);
+      const languageQuestions = staticQuizData[language];
+      const shuffledQuestions = shuffleArray(languageQuestions).slice(0, 10);
       dispatch({ type: 'START_QUIZ', payload: { questions: shuffledQuestions }});
     }, 500);
 
-  }, []);
+  }, [language]);
 
   const handleNextQuestion = () => {
     if (selectedAnswer === null) {
@@ -318,5 +319,3 @@ export function QuizClient() {
     </div>
   );
 }
-
-    
