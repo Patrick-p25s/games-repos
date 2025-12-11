@@ -145,8 +145,8 @@ export function AdminDashboard() {
   
   // Calcule le temps de jeu total de tous les utilisateurs.
   const totalPlaytimeSeconds = allUsers.reduce((total, user) => {
-    const userTotalSeconds = Object.values(user.stats.games).reduce((acc, game) => acc + game.totalPlaytime, 0);
-    return total + userTotalSeconds;
+    if (!user.stats || !user.stats.overall) return total;
+    return total + user.stats.overall.totalPlaytime;
   }, 0);
   
   // Formate le temps de jeu total en une chaîne lisible (ex: "5h 30m").
@@ -164,9 +164,11 @@ export function AdminDashboard() {
   
   // Compte le jeu le plus populaire en se basant sur le jeu favori de chaque utilisateur.
   const gameCounts = allUsers.reduce((acc, user) => {
-    const game = user.stats.overall.favoriteGame;
-    if (game && game !== "N/A") {
-        acc[game] = (acc[game] || 0) + 1;
+    if (user && user.stats && user.stats.overall) {
+        const game = user.stats.overall.favoriteGame;
+        if (game && game !== "N/A") {
+            acc[game] = (acc[game] || 0) + 1;
+        }
     }
     return acc;
   }, {} as Record<string, number>);

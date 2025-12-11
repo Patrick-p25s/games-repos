@@ -9,7 +9,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 
@@ -123,26 +123,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useFirebaseAuth();
   const db = useFirestore();
 
-  useEffect(() => {
-    // This effect runs only once on the client side after initial hydration.
-    // It's the designated place for all client-side-only logic that needs
-    // to run once, like accessing localStorage.
-    if (typeof window !== 'undefined') {
-        const storedUsers = localStorage.getItem('allUsers');
-        const storedFeedback = localStorage.getItem('allFeedback');
-        const storedViewCount = localStorage.getItem('viewCount');
-        
-        if (storedUsers) setAllUsers(JSON.parse(storedUsers));
-        if (storedFeedback) setAllFeedback(JSON.parse(storedFeedback));
-        if (storedViewCount) setViewCount(parseInt(storedViewCount, 10));
-
-        const hasIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
-        if (!hasIncremented) {
-          incrementViewCount();
-          sessionStorage.setItem("nextgen-games-view-incremented", "true");
-        }
+  const fetchViewCount = useCallback(async () => {
+    if (!db) return;
+    const viewCounterRef = doc(db, 'app-stats', 'viewCounter');
+    const docSnap = await getDoc(viewCounterRef);
+    if (docSnap.exists()) {
+        setViewCount(docSnap.data().count);
+    } else {
+        // Initialize if it doesn't exist
+        await setDoc(viewCounterRef, { count: 0 });
+        setViewCount(0);
     }
-  }, []); // Empty dependency array ensures this runs once client-side.
+  }, [db]);
+  
+  useEffect(() => {
+    fetchViewCount();
+  }, [fetchViewCount]);
+
+  const incrementViewCount = useCallback(async () => {
+      if (!db) return;
+      const viewCounterRef = doc(db, 'app-stats', 'viewCounter');
+      try {
+          await runTransaction(db, async (transaction) => {
+              const docSnap = await transaction.get(viewCounterRef);
+              const newCount = (docSnap.data()?.count || 0) + 1;
+              transaction.update(viewCounterRef, { count: newCount });
+              setViewCount(newCount); // Optimistically update UI
+          });
+      } catch (e) {
+          console.error("Failed to increment view count:", e);
+      }
+  }, [db]);
 
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
@@ -227,60 +238,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || !db) return;
 
     const userDocRef = doc(db, 'users', user.id);
-    const userDoc = await getDoc(userDocRef);
-    if (!userDoc.exists()) return;
-
-    const currentUserData = userDoc.data() as User;
-    const updatedUser: User = JSON.parse(JSON.stringify(currentUserData)); // Deep copy
-
-    const gameStats = updatedUser.stats.games[gameName];
-    const overallStats = updatedUser.stats.overall;
-
-    gameStats.gamesPlayed += 1;
-    gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-
-    const playtimeToAdd = typeof newGameStats.totalPlaytime === 'number' ? newGameStats.totalPlaytime : 0;
-    gameStats.totalPlaytime = (typeof gameStats.totalPlaytime === 'number' ? gameStats.totalPlaytime : 0) + playtimeToAdd;
     
-
-    // Handle game-specific stats
-    Object.keys(newGameStats).forEach(key => {
-        if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
-            const statKey = key as keyof GameStats;
-            if (typeof (gameStats as any)[statKey] === 'number') {
-                (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
-            } else {
-                (gameStats as any)[statKey] = newGameStats[statKey];
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) {
+                throw "Document does not exist!";
             }
-        }
-    });
+            
+            const currentUserData = userDoc.data() as User;
+            const updatedUser: User = JSON.parse(JSON.stringify(currentUserData)); // Deep copy
 
-    if (gameName === 'Quiz') {
-        const quizStats = gameStats as User['stats']['games']['Quiz'];
-        quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
-    }
-    
-    let isWin = false;
-    if (gameName === 'Quiz') {
-        const score = newGameStats.highScore ?? 0;
-        isWin = (score / 15) >= 0.5;
-    } else {
-        isWin = (newGameStats.highScore ?? 0) > 0;
-    }
+            const gameStats = updatedUser.stats.games[gameName];
+            const overallStats = updatedUser.stats.overall;
 
-    overallStats.totalGames = (overallStats.totalGames || 0) + 1;
-    if (isWin) {
-        overallStats.totalWins = (overallStats.totalWins || 0) + 1;
-    }
-    
-    overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
-    overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
+            gameStats.gamesPlayed += 1;
+            gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
 
-    const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
-    overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
-    
-    await updateDoc(userDocRef, { stats: updatedUser.stats });
-    setUser(updatedUser);
+            const playtimeToAdd = typeof newGameStats.totalPlaytime === 'number' ? newGameStats.totalPlaytime : 0;
+            gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + playtimeToAdd;
+            
+
+            // Handle game-specific stats
+            Object.keys(newGameStats).forEach(key => {
+                if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
+                    const statKey = key as keyof GameStats;
+                    if (typeof (gameStats as any)[statKey] === 'number') {
+                        (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                    } else {
+                        (gameStats as any)[statKey] = newGameStats[statKey];
+                    }
+                }
+            });
+
+            if (gameName === 'Quiz') {
+                const quizStats = gameStats as User['stats']['games']['Quiz'];
+                quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
+            }
+            
+            let isWin = false;
+            if (gameName === 'Quiz') {
+                const score = newGameStats.highScore ?? 0;
+                isWin = (score / 15) >= 0.5;
+            } else {
+                isWin = (newGameStats.highScore ?? 0) > 0;
+            }
+
+            overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+            if (isWin) {
+                overallStats.totalWins = (overallStats.totalWins || 0) + 1;
+            }
+            
+            overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
+            overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
+
+            const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
+            overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
+            
+            transaction.update(userDocRef, { stats: updatedUser.stats });
+            setUser(updatedUser); // Optimistic UI update
+        });
+    } catch (e) {
+        console.error("Stat update transaction failed: ", e);
+    }
   }, [user, db]);
   
   const resetStats = async () => {
@@ -339,14 +359,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
   }
 
-  const incrementViewCount = useCallback(() => {
-    setViewCount(c => {
-      const newCount = c + 1;
-      localStorage.setItem('viewCount', String(newCount));
-      return newCount;
-    });
-  }, []);
-
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
@@ -372,5 +384,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
