@@ -35,7 +35,7 @@ const formSchema = z.object({
 })
 
 export default function SignupPage() {
-  const { login, allUsers } = useAuth()
+  const { signup } = useAuth()
   const { t } = useLocale();
   const router = useRouter()
   const { toast } = useToast()
@@ -49,24 +49,21 @@ export default function SignupPage() {
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    const emailExists = allUsers.some(user => user.email.toLowerCase() === data.email.toLowerCase());
-
-    if (emailExists) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      await signup(data.username, data.email, data.password)
+      toast({
+          title: t('accountCreated'),
+          description: t('signedUpSuccess'),
+      })
+      router.push("/")
+    } catch (error: any) {
         toast({
             variant: "destructive",
             title: t('error'),
-            description: t('emailInUse'),
+            description: error.code === 'auth/email-already-in-use' ? t('emailInUse') : (error.message || 'An unexpected error occurred.'),
         });
-        return;
     }
-
-    login(data.email, data.username)
-    toast({
-        title: t('accountCreated'),
-        description: t('signedUpSuccess'),
-    })
-    router.push("/")
   }
 
   return (

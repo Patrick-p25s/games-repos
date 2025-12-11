@@ -1,3 +1,4 @@
+
 // Ce fichier contient le composant du tableau de bord de l'administrateur.
 "use client";
 
@@ -80,10 +81,10 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     });
 
     // Gère la soumission du formulaire de réponse.
-    function onSubmit(values: z.infer<typeof replySchema>) {
-        sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
+    async function onSubmit(values: z.infer<typeof replySchema>) {
+        await sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
         // Après avoir répondu, nous supprimons l'élément de feedback de la file d'attente de l'admin.
-        deleteFeedback(feedbackItem.id);
+        await deleteFeedback(feedbackItem.id);
         toast({
           title: t('replySent'),
           description: t('replySentMessage', { name: feedbackItem.name }),
@@ -173,8 +174,8 @@ export function AdminDashboard() {
   const mostPopularGame = Object.keys(gameCounts).reduce((a, b) => gameCounts[a] > gameCounts[b] ? a : b, 'N/A');
 
   // Gère la suppression d'un feedback.
-  const handleDeleteFeedback = (id: number) => {
-    deleteFeedback(id);
+  const handleDeleteFeedback = async (id: string) => {
+    await deleteFeedback(id);
     toast({
       title: t('feedbackDeleted'),
       description: t('feedbackDeletedMessage', { id }),
@@ -326,7 +327,7 @@ export function AdminDashboard() {
                                     </AlertDialog>
                                 </div>
                             </div>
-                            <CardDescription>{t('from', { name: item.name, email: item.email })} {t('on')} {item.date}</CardDescription>
+                            <CardDescription>{t('from', { name: item.name, email: item.email })} {t('on')} {new Date(item.date).toLocaleDateString()}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <p className="text-muted-foreground">{item.message}</p>

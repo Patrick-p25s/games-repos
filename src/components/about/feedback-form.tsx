@@ -54,17 +54,25 @@ export function FeedbackForm() {
     }
   }, [isLoggedIn, user, form])
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    submitFeedback(values);
-    toast({
-      title: t('feedbackSent'),
-      description: t('feedbackSentMessage'),
-    })
-    form.reset({
-        ...form.getValues(),
-        subject: '',
-        message: '',
-    });
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await submitFeedback(values);
+      toast({
+        title: t('feedbackSent'),
+        description: t('feedbackSentMessage'),
+      })
+      form.reset({
+          ...form.getValues(),
+          subject: '',
+          message: '',
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t('error'),
+        description: "Failed to send feedback. Please try again.",
+      })
+    }
   }
 
   return (

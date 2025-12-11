@@ -49,8 +49,8 @@ export default function SettingsPage() {
     }
   }, [isLoggedIn, user, router, form]);
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    updateUser({ name: data.name, avatar: data.avatar || user?.avatar });
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    await updateUser({ name: data.name, avatar: data.avatar || user?.avatar });
     toast({
       title: t('settingsSaved'),
       description: t('profileUpdated'),

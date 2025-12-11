@@ -1,3 +1,4 @@
+
 // Ce fichier affiche les statistiques de jeu détaillées pour l'utilisateur sur sa page de profil.
 "use client"
 
@@ -95,8 +96,8 @@ export function UserStats() {
 
 
     // Gère la réinitialisation des statistiques de l'utilisateur.
-    const handleResetStats = () => {
-        resetStats();
+    const handleResetStats = async () => {
+        await resetStats();
         toast({
             title: t('statsReset'),
             description: t('statsResetMessage'),

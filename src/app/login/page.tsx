@@ -47,22 +47,21 @@ export default function LoginPage() {
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    if (data.email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com' && data.password !== 'pepeta.p25s') {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      await login(data.email, data.password);
       toast({
+        title: t('loginSuccess'),
+        description: t('welcomeBack'),
+      })
+      router.push("/")
+    } catch (error: any) {
+       toast({
         variant: "destructive",
-        title: t('invalidPassword'),
-        description: t('checkPassword'),
+        title: t('error'),
+        description: error.message || "An unexpected error occurred.",
       });
-      return;
     }
-    
-    login(data.email)
-    toast({
-      title: t('loginSuccess'),
-      description: t('welcomeBack'),
-    })
-    router.push("/")
   }
 
   return (

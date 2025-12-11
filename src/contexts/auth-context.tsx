@@ -2,6 +2,16 @@
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 
 // Définit la structure des statistiques pour chaque jeu.
 type GameStats = {
@@ -17,6 +27,7 @@ export type InboxMessage = {
     subject: string;
     message: string;
     date: string;
+    read: boolean;
 };
 
 // Définit la structure principale des données de l'utilisateur.
@@ -48,7 +59,7 @@ export type User = {
 
 // Définit la structure d'une soumission de feedback.
 export type Feedback = {
-  id: number;
+  id: string;
   name: string;
   email: string;
   subject: string;
@@ -65,16 +76,18 @@ interface AuthContextType {
   allFeedback: Feedback[];
   isAdmin: boolean;
   viewCount: number;
-  login: (email: string, name?: string) => void;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateUser: (newDetails: Partial<Omit<User, 'stats' | 'id' | 'role'>>) => void;
-  updateUserStats: (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => void;
-  resetStats: () => void;
-  submitFeedback: (feedback: Omit<Feedback, 'id' | 'date' | 'userId'>) => void;
-  deleteFeedback: (feedbackId: number) => void;
-  sendReply: (userId: string, subject: string, message: string) => void;
+  updateUser: (newDetails: Partial<Omit<User, 'stats' | 'id' | 'role'>>) => Promise<void>;
+  updateUserStats: (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => Promise<void>;
+  resetStats: () => Promise<void>;
+  submitFeedback: (feedback: Omit<Feedback, 'id' | 'date' | 'userId'>) => Promise<void>;
+  deleteFeedback: (feedbackId: string) => Promise<void>;
+  sendReply: (userId: string, subject: string, message: string) => Promise<void>;
   incrementViewCount: () => void;
-  deleteMessage: (messageId: string) => void;
+  deleteMessage: (messageId: string) => Promise<void>;
+  markMessageAsRead: (messageId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -106,274 +119,247 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [viewCount, setViewCount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const router = useRouter();
+  const auth = useFirebaseAuth();
+  const db = useFirestore();
 
-  // Au montage initial, charge toutes les données depuis localStorage, CÔTÉ CLIENT UNIQUEMENT.
   useEffect(() => {
-    // Ce code ne s'exécute que dans le navigateur
+    // This effect runs only once on the client side after initial hydration.
+    // It's the designated place for all client-side-only logic that needs
+    // to run once, like accessing localStorage.
     if (typeof window !== 'undefined') {
-      try {
-        const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
-        if (storedAllUsers) {
-          const parsedUsers: User[] = JSON.parse(storedAllUsers);
-          parsedUsers.forEach(u => {
-            if (!u.inbox) u.inbox = [];
-            if (!u.stats) u.stats = JSON.parse(JSON.stringify(defaultStats));
-          });
-          setAllUsers(parsedUsers);
-        }
-
-        const storedUser = localStorage.getItem("nextgen-games-user");
-        if (storedUser) {
-          const parsedUser: User = JSON.parse(storedUser);
-          if (!parsedUser.inbox) parsedUser.inbox = [];
-          if (!parsedUser.stats) parsedUser.stats = JSON.parse(JSON.stringify(defaultStats));
-          setUser(parsedUser);
-        }
-
-        const storedAllFeedback = localStorage.getItem("nextgen-games-allFeedback");
-        if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
-
-        const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-        setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
+        const storedUsers = localStorage.getItem('allUsers');
+        const storedFeedback = localStorage.getItem('allFeedback');
+        const storedViewCount = localStorage.getItem('viewCount');
         
-      } catch (error) {
-        console.error("Échec de l'analyse des données depuis localStorage", error);
-        localStorage.clear();
+        if (storedUsers) setAllUsers(JSON.parse(storedUsers));
+        if (storedFeedback) setAllFeedback(JSON.parse(storedFeedback));
+        if (storedViewCount) setViewCount(parseInt(storedViewCount, 10));
+
+        const hasIncremented = sessionStorage.getItem("nextgen-games-view-incremented");
+        if (!hasIncremented) {
+          incrementViewCount();
+          sessionStorage.setItem("nextgen-games-view-incremented", "true");
+        }
+    }
+  }, []); // Empty dependency array ensures this runs once client-side.
+
+
+  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
+    if (!db) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      setUser({ id: userDoc.id, ...userDoc.data() } as User);
+    }
+  }, [db]);
+
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        await fetchUserData(firebaseUser);
+      } else {
+        setUser(null);
       }
-      setIsLoaded(true); // Marque le chargement comme terminé
+      setIsLoaded(true);
+    });
+    return () => unsubscribe();
+  }, [auth, fetchUserData]);
+
+  const fetchAdminData = useCallback(async () => {
+    if (user?.role === 'admin' && db) {
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      setAllUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+
+      const feedbackCollection = collection(db, 'feedback');
+      const feedbackSnapshot = await getDocs(feedbackCollection);
+      setAllFeedback(feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback)));
     }
-  }, []);
+  }, [user?.role, db]);
 
-  // Fonction utilitaire pour sauvegarder l'utilisateur actuellement connecté et la liste de tous les utilisateurs.
-  const saveUser = useCallback((userToSave: User | null) => {
-    setUser(userToSave);
-    if (userToSave) {
-        localStorage.setItem("nextgen-games-user", JSON.stringify(userToSave));
-        setAllUsers(prevAllUsers => {
-            const userIndex = prevAllUsers.findIndex(u => u.id === userToSave.id);
-            const newAllUsers = [...prevAllUsers];
-            if (userIndex > -1) {
-                newAllUsers[userIndex] = userToSave;
-            } else {
-                newAllUsers.push(userToSave);
-            }
-            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(newAllUsers));
-            return newAllUsers;
-        });
-    } else {
-        localStorage.removeItem("nextgen-games-user");
-    }
-  }, []);
+  useEffect(() => {
+    fetchAdminData();
+  }, [fetchAdminData]);
 
-  // Fonction utilitaire pour sauvegarder les feedbacks dans l'état et localStorage.
-  const saveFeedback = useCallback((feedbackData: Feedback[]) => {
-    setAllFeedback(feedbackData);
-    localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackData));
-  }, []);
-
-  // Fonction de connexion : trouve un utilisateur existant ou en crée un nouveau.
-  const login = useCallback((email: string, name?: string) => {
+  const signup = async (name: string, email: string, password: string) => {
+    if (!auth || !db) return;
     const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
-    const userId = email.toLowerCase();
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
     
-    const existingUsers = JSON.parse(localStorage.getItem("nextgen-games-allUsers") || "[]") as User[];
-    let loggedInUser = existingUsers.find(u => u.id === userId);
-
-    if (!loggedInUser) {
-        loggedInUser = {
-          id: userId,
-          name: name || (isAdminUser ? "Patrick Nomentsoa" : "Player One"),
-          email: email,
-          avatar: `https://picsum.photos/seed/${email}/96/96`,
-          role: isAdminUser ? 'admin' : 'user',
-          stats: JSON.parse(JSON.stringify(defaultStats)), // Copie profonde pour la sécurité
-          inbox: [],
-        };
-    } else {
-        if (!loggedInUser.inbox) loggedInUser.inbox = [];
-        if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
-    }
-    
-    saveUser(loggedInUser);
-  }, [saveUser]);
-
-  // Gère la déconnexion de l'utilisateur.
-  const logout = useCallback(() => {
-    saveUser(null);
-  }, [saveUser]);
-
-  // Met à jour les informations de l'utilisateur.
-  const updateUser = useCallback((newDetails: Partial<User>) => {
-    setUser(currentUser => {
-      if (currentUser) {
-        const updatedUser = { ...currentUser, ...newDetails };
-        saveUser(updatedUser);
-        return updatedUser;
-      }
-      return null;
-    });
-  }, [saveUser]);
-  
-  // Met à jour les statistiques d'un jeu pour l'utilisateur.
-  const updateUserStats = useCallback((gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
-    setUser(currentUser => {
-        if (!currentUser) return null;
-
-        const updatedUser: User = JSON.parse(JSON.stringify(currentUser));
-        
-        const gameStats = updatedUser.stats.games[gameName];
-        const overallStats = updatedUser.stats.overall;
-
-        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
-        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-        gameStats.totalPlaytime += newGameStats.totalPlaytime || 0;
-
-        Object.keys(newGameStats).forEach(key => {
-            if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
-                const statKey = key as keyof GameStats;
-                if (typeof (gameStats as any)[statKey] === 'number') {
-                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
-                } else {
-                     (gameStats as any)[statKey] = newGameStats[statKey];
-                }
-            }
-        });
-        
-        if (gameName === 'Quiz') {
-            const quizStats = gameStats as User['stats']['games']['Quiz'];
-            quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
-        }
-
-        let isWin = false;
-        const score = newGameStats.highScore ?? 0;
-        if (gameName === 'Quiz') {
-             if(score > 0) isWin = true;
-        } else if (score > 0) {
-             isWin = true;
-        }
-
-        overallStats.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
-        if (isWin) {
-            overallStats.totalWins = (overallStats.totalWins || 0) + 1;
-        }
-
-        overallStats.winRate = overallStats.totalGames > 0 
-            ? Math.round(((overallStats.totalWins || 0) / overallStats.totalGames) * 100)
-            : 0;
-            
-        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
-        
-        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
-        overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
-
-        saveUser(updatedUser);
-        return updatedUser;
-    });
-  }, [saveUser]);
-  
-  // Réinitialise toutes les statistiques de l'utilisateur.
-  const resetStats = useCallback(() => {
-      setUser(currentUser => {
-        if (currentUser) {
-          const updatedUser = { ...currentUser, stats: JSON.parse(JSON.stringify(defaultStats)) };
-          saveUser(updatedUser);
-          return updatedUser;
-        }
-        return null;
-      });
-  }, [saveUser]);
-  
-  // Soumet un nouveau feedback.
-  const submitFeedback = useCallback((feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
-    if (!user) return;
-    setAllFeedback(currentFeedback => {
-        const newFeedback: Feedback = {
-            ...feedbackData,
-            id: Date.now(),
-            date: new Date().toLocaleDateString('en-CA'),
-            userId: user.id
-        };
-        const updatedFeedback = [...currentFeedback, newFeedback];
-        localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(updatedFeedback));
-        return updatedFeedback;
-    });
-  }, [user]);
-
-  // Supprime un feedback.
-  const deleteFeedback = useCallback((feedbackId: number) => {
-    const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
-    saveFeedback(updatedFeedback);
-  }, [allFeedback, saveFeedback]);
-
-  // Envoie une réponse à un utilisateur et met à jour les données de manière atomique.
-  const sendReply = useCallback((userId: string, subject: string, message: string) => {
-    const newInboxMessage: InboxMessage = {
-        id: `msg-${Date.now()}`,
-        subject: `Re: ${subject}`,
-        message,
-        date: new Date().toLocaleDateString('en-CA'),
+    const newUser: User = {
+      id: firebaseUser.uid,
+      name,
+      email,
+      avatar: `https://picsum.photos/seed/${email}/96/96`,
+      role: isAdminUser ? 'admin' : 'user',
+      stats: JSON.parse(JSON.stringify(defaultStats)),
+      inbox: [],
     };
     
-    setAllUsers(currentUsers => {
-        const updatedUsers = currentUsers.map(u => {
-            if (u.id === userId) {
-                const newInbox = u.inbox ? [newInboxMessage, ...u.inbox] : [newInboxMessage];
-                return { ...u, inbox: newInbox };
-            }
-            return u;
-        });
-        
-        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(updatedUsers));
-        
-        if (user && user.id === userId) {
-            const updatedLoggedInUser = updatedUsers.find(u => u.id === userId);
-            if (updatedLoggedInUser) {
-                setUser(updatedLoggedInUser);
-                localStorage.setItem("nextgen-games-user", JSON.stringify(updatedLoggedInUser));
+    await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+    setUser(newUser);
+  };
+  
+  const login = async (email: string, password: string) => {
+    if (!auth) return;
+    await signInWithEmailAndPassword(auth, email, password);
+    // onAuthStateChanged will handle setting the user state
+  };
+
+  const logout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    setUser(null);
+    router.push('/');
+  };
+
+  const updateUser = async (newDetails: Partial<User>) => {
+    if (!user || !db) return;
+    const userDocRef = doc(db, 'users', user.id);
+    await updateDoc(userDocRef, newDetails);
+    setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
+  };
+  
+  const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
+    if (!user || !db) return;
+
+    const userDocRef = doc(db, 'users', user.id);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) return;
+
+    const currentUserData = userDoc.data() as User;
+    const updatedUser: User = JSON.parse(JSON.stringify(currentUserData)); // Deep copy
+
+    const gameStats = updatedUser.stats.games[gameName];
+    const overallStats = updatedUser.stats.overall;
+
+    gameStats.gamesPlayed += 1;
+    gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
+
+    const playtimeToAdd = typeof newGameStats.totalPlaytime === 'number' ? newGameStats.totalPlaytime : 0;
+    gameStats.totalPlaytime = (typeof gameStats.totalPlaytime === 'number' ? gameStats.totalPlaytime : 0) + playtimeToAdd;
+    
+
+    // Handle game-specific stats
+    Object.keys(newGameStats).forEach(key => {
+        if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
+            const statKey = key as keyof GameStats;
+            if (typeof (gameStats as any)[statKey] === 'number') {
+                (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+            } else {
+                (gameStats as any)[statKey] = newGameStats[statKey];
             }
         }
-        
-        return updatedUsers;
     });
-  }, [user]);
 
-  // Supprime un message de la boîte de réception de l'utilisateur.
-  const deleteMessage = useCallback((messageId: string) => {
-    if (!user) return;
-    const updatedUser = { ...user, inbox: user.inbox.filter(msg => msg.id !== messageId) };
-    saveUser(updatedUser);
-  }, [user, saveUser]);
+    if (gameName === 'Quiz') {
+        const quizStats = gameStats as User['stats']['games']['Quiz'];
+        quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
+    }
+    
+    let isWin = false;
+    if (gameName === 'Quiz') {
+        const score = newGameStats.highScore ?? 0;
+        isWin = (score / 15) >= 0.5;
+    } else {
+        isWin = (newGameStats.highScore ?? 0) > 0;
+    }
 
-  // Incrémente le compteur de vues de l'application une seule fois par session.
+    overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+    if (isWin) {
+        overallStats.totalWins = (overallStats.totalWins || 0) + 1;
+    }
+    
+    overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
+    overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
+
+    const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
+    overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
+    
+    await updateDoc(userDocRef, { stats: updatedUser.stats });
+    setUser(updatedUser);
+  }, [user, db]);
+  
+  const resetStats = async () => {
+    if (!user || !db) return;
+    await updateDoc(doc(db, 'users', user.id), { stats: defaultStats });
+    setUser(currentUser => currentUser ? { ...currentUser, stats: defaultStats } : null);
+  };
+  
+  const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
+    if (!user || !db) return;
+    const newFeedback = {
+        ...feedbackData,
+        userId: user.id,
+        date: new Date().toISOString()
+    };
+    const feedbackCollection = collection(db, 'feedback');
+    await setDoc(doc(feedbackCollection), newFeedback);
+    fetchAdminData();
+  };
+
+  const deleteFeedback = async (feedbackId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'feedback', feedbackId));
+    setAllFeedback(current => current.filter(f => f.id !== feedbackId));
+  };
+
+  const sendReply = async (userId: string, subject: string, message: string) => {
+    if (!db) return;
+    const userDocRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      const userData = userDoc.data() as User;
+      const newInboxMessage: InboxMessage = {
+          id: `msg-${Date.now()}`,
+          subject: `Re: ${subject}`,
+          message,
+          date: new Date().toLocaleDateString('en-CA'),
+          read: false
+      };
+      const newInbox = [newInboxMessage, ...(userData.inbox || [])];
+      await updateDoc(userDocRef, { inbox: newInbox });
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!user || !db) return;
+    const updatedInbox = user.inbox.filter(msg => msg.id !== messageId);
+    await updateDoc(doc(db, 'users', user.id), { inbox: updatedInbox });
+    setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+  };
+  
+  const markMessageAsRead = async (messageId: string) => {
+    if (!user || !db) return;
+    const updatedInbox = user.inbox.map(msg => msg.id === messageId ? {...msg, read: true} : msg);
+    await updateDoc(doc(db, 'users', user.id), { inbox: updatedInbox });
+    setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+  }
+
   const incrementViewCount = useCallback(() => {
-    setViewCount(currentCount => {
-        const newCount = currentCount + 1;
-        try {
-            localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-        } catch (error) {
-            console.error("Échec de la mise à jour du compteur de vues dans localStorage", error);
-        }
-        return newCount;
+    setViewCount(c => {
+      const newCount = c + 1;
+      localStorage.setItem('viewCount', String(newCount));
+      return newCount;
     });
   }, []);
 
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
-  // Rassemble toutes les valeurs à fournir au contexte.
-  const contextValue = {
+  const contextValue: AuthContextType = {
     isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, 
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
-    sendReply, viewCount, incrementViewCount, deleteMessage
+    sendReply, viewCount, incrementViewCount, deleteMessage, markMessageAsRead,
+    signup
   };
   
-  if (!isLoaded) {
-    return null; // ou un spinner de chargement si vous préférez
-  }
-
   return (
     <AuthContext.Provider value={contextValue}>
-      {children}
+      {isLoaded ? children : null}
     </AuthContext.Provider>
   );
 }
@@ -386,3 +372,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    

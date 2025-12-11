@@ -34,15 +34,23 @@ function Inbox() {
   const { t } = useLocale();
   const { toast } = useToast();
 
-  const handleDelete = (messageId: string) => {
-    deleteMessage(messageId);
-    toast({
-        title: t('messageDeleted'),
-        description: t('messageDeletedSuccess'),
-    });
+  const handleDelete = async (messageId: string) => {
+    try {
+      await deleteMessage(messageId);
+      toast({
+          title: t('messageDeleted'),
+          description: t('messageDeletedSuccess'),
+      });
+    } catch(e) {
+        toast({
+            variant: "destructive",
+            title: t('error'),
+            description: "Failed to delete message"
+        })
+    }
   }
 
-  if (!user || user.inbox.length === 0) {
+  if (!user || !user.inbox || user.inbox.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -74,7 +82,7 @@ function Inbox() {
                     <AccordionTrigger>
                         <div className="flex justify-between w-full pr-4 items-center">
                             <span className="font-semibold text-left">{msg.subject}</span>
-                            <span className="text-sm text-muted-foreground ml-4 shrink-0">{msg.date}</span>
+                            <span className="text-sm text-muted-foreground ml-4 shrink-0">{new Date(msg.date).toLocaleDateString()}</span>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent className="text-base text-muted-foreground p-4 bg-muted/50 rounded-md space-y-4">
@@ -150,5 +158,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    

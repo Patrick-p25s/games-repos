@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Footer } from "@/components/layout/footer";
 import { LocaleProvider } from "@/contexts/locale-context";
 import { AppViewCounter } from "@/components/app-view-counter";
+import { FirebaseClientProvider } from "@/firebase";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const lexend = Lexend({ subsets: ["latin"], variable: "--font-lexend" });
@@ -39,17 +40,19 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <LocaleProvider>
-              <AppViewCounter />
-              <div className="relative flex min-h-screen flex-col">
-                <Header />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-              <Toaster />
-            </LocaleProvider>
-          </AuthProvider>
+          <FirebaseClientProvider>
+            <AuthProvider>
+              <LocaleProvider>
+                <AppViewCounter />
+                <div className="relative flex min-h-screen flex-col">
+                  <Header />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+                <Toaster />
+              </LocaleProvider>
+            </AuthProvider>
+          </FirebaseClientProvider>
         </ThemeProvider>
       </body>
     </html>
