@@ -45,7 +45,6 @@ export function MemoryGame() {
   const [time, setTime] = useState(0);
   const [isWon, setIsWon] = useState(false);
   const [score, setScore] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'memory');
@@ -65,8 +64,8 @@ export function MemoryGame() {
   }, []);
   
   const endGame = useCallback((won: boolean) => {
-    setIsWon(won);
     setGameState('over');
+    setIsWon(won);
     if (timerRef.current) clearInterval(timerRef.current);
     const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
     const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - finalTime) : 0;
@@ -74,7 +73,7 @@ export function MemoryGame() {
   }, [moves]);
   
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated && user) {
+    if (gameState === 'over' && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Memory;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
@@ -84,9 +83,9 @@ export function MemoryGame() {
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
-        setStatsUpdated(true);
     }
-  }, [gameState, score, isWon, user, statsUpdated, updateUserStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
   useEffect(() => {
     setCards(generateCards());
@@ -99,7 +98,6 @@ export function MemoryGame() {
     setTime(0);
     setScore(0);
     setIsWon(false);
-    setStatsUpdated(false);
     setGameState('playing');
     startTimeRef.current = Date.now();
   }, [generateCards]);

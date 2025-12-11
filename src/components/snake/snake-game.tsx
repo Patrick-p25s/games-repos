@@ -1,3 +1,4 @@
+
 // Ce fichier contient le composant principal pour le jeu du serpent (Snake).
 'use client';
 
@@ -34,7 +35,6 @@ export function SnakeGame() {
   const [applesEaten, setApplesEaten] = useState(0); // Suivi séparé des pommes
   const [highScore, setHighScore] = useState(0);
   const [time, setTime] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
   
   // Références pour les boucles de jeu et le temps
   const gameLoopRef = useRef<NodeJS.Timeout>();
@@ -65,7 +65,6 @@ export function SnakeGame() {
     setScore(0);
     setApplesEaten(0);
     setTime(0);
-    setStatsUpdated(false);
   }, [createFood]);
 
   // Démarre une nouvelle partie
@@ -85,17 +84,17 @@ export function SnakeGame() {
 
   // Met à jour les statistiques de l'utilisateur lorsque la partie est terminée
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated && user && startTimeRef.current > 0) {
+    if (gameState === 'over' && user && startTimeRef.current > 0) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Snake', {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
             applesEaten: applesEaten,
         });
-        setStatsUpdated(true);
         startTimeRef.current = 0;
     }
-  }, [gameState, score, user, updateUserStats, statsUpdated, applesEaten]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
 
   // Charge le meilleur score de l'utilisateur au montage

@@ -92,15 +92,14 @@ export function PuzzleGame() {
   const [time, setTime] = useState(0);
   const [isWon, setIsWon] = useState(false);
   const [score, setScore] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>();
   const gameImage = useMemo(() => PlaceHolderImages.find(img => img.id === 'puzzle'), []);
   const startTimeRef = useRef<number>(0);
 
 
   const endGame = useCallback((won: boolean) => {
-    setIsWon(won);
     setGameState('over');
+    setIsWon(won);
     if (timerRef.current) clearInterval(timerRef.current);
     const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
     const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - finalTime) : 0;
@@ -108,7 +107,7 @@ export function PuzzleGame() {
   }, [moves]);
 
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated && user) {
+    if (gameState === 'over' && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Puzzle;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
@@ -118,9 +117,9 @@ export function PuzzleGame() {
             totalPlaytime: playtimeInSeconds,
             bestTime: newBestTime,
         });
-        setStatsUpdated(true);
     }
-  }, [gameState, score, isWon, user, statsUpdated, updateUserStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
   useEffect(() => {
     const { grid: newGrid, emptyPos: newEmptyPos } = createGrid();
@@ -148,7 +147,6 @@ export function PuzzleGame() {
     setTime(0);
     setScore(0);
     setIsWon(false);
-    setStatsUpdated(false);
     setGameState('playing');
     startTimeRef.current = Date.now();
   }, []);

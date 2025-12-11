@@ -1,3 +1,4 @@
+
 // Ce fichier contient le composant principal du jeu Tetris.
 'use client';
 
@@ -49,7 +50,6 @@ export function TetrisGame() {
   const [level, setLevel] = useState(1);
   const [linesCleared, setLinesCleared] = useState(0);
   const [time, setTime] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
   const gameImage = PlaceHolderImages.find(img => img.id === 'tetris');
   const startTimeRef = useRef<number>(0);
 
@@ -79,16 +79,16 @@ export function TetrisGame() {
 
   // Met à jour les statistiques du joueur à la fin de la partie.
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated && user) {
+    if (gameState === 'over' && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Tetris', {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
             linesCleared: linesCleared,
         });
-        setStatsUpdated(true);
     }
-  }, [gameState, score, linesCleared, user, updateUserStats, statsUpdated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
   // Réinitialise l'état du jeu pour une nouvelle partie.
   const resetGame = useCallback(() => {
@@ -103,7 +103,6 @@ export function TetrisGame() {
     setLevel(1);
     setLinesCleared(0);
     setTime(0);
-    setStatsUpdated(false);
   }, [randomTetromino]);
   
   useEffect(() => {

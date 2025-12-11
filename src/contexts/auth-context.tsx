@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -96,6 +97,9 @@ const defaultStats: User['stats'] = {
     Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
   }
 };
+
+const hasUpdatedStatsThisSession: { [game: string]: boolean } = {};
+
 
 // Le composant AuthProvider enveloppe l'application et fournit le contexte d'authentification.
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -224,23 +228,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const gameStats = updatedUser.stats.games[gameName];
         const overallStats = updatedUser.stats.overall;
 
-        gameStats.gamesPlayed += 1;
-        gameStats.highScore = Math.max(gameStats.highScore, newGameStats.highScore || 0);
-        gameStats.totalPlaytime += newGameStats.totalPlaytime || 0;
+        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
+        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
+        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
 
         // Handle specific game stats
         Object.keys(newGameStats).forEach(key => {
-            if (!['highScore', 'totalPlaytime'].includes(key)) {
+            if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
                 const statKey = key as keyof GameStats;
                 if (typeof (gameStats as any)[statKey] === 'number') {
-                    (gameStats as any)[statKey] += (newGameStats[statKey] || 0);
+                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
                 } else {
                      (gameStats as any)[statKey] = newGameStats[statKey];
                 }
             }
         });
         
-        if (gameName === 'Quiz' && 'totalCorrect' in newGameStats && 'totalQuestions' in newGameStats) {
+        if (gameName === 'Quiz') {
             const quizStats = gameStats as User['stats']['games']['Quiz'];
             quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
         }
@@ -256,18 +260,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Update overall stats
-        overallStats.totalGames += 1;
+        overallStats.totalGames = (overallStats.totalGames || 0) + 1;
         if (isWin) {
-            overallStats.totalWins += 1;
+            overallStats.totalWins = (overallStats.totalWins || 0) + 1;
         }
 
         overallStats.winRate = overallStats.totalGames > 0 
-            ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100)
+            ? Math.round(((overallStats.totalWins || 0) / overallStats.totalGames) * 100)
             : 0;
             
-        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
+        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
         
-        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => b.totalPlaytime - a.totalPlaytime)[0];
+        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
         overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
 
         saveUser(updatedUser);
