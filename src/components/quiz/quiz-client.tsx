@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Check, Loader2, Play, Home, X, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, useCallback, useReducer } from "react";
+import { useEffect, useState, useCallback, useReducer, useRef } from "react";
 import { useLocale } from "@/contexts/locale-context";
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
@@ -38,7 +38,6 @@ type QuizState = {
   selectedAnswer: number | null;
   userAnswers: (number | null)[];
   score: number;
-  startTime: number;
   statsUpdated: boolean;
 };
 
@@ -50,7 +49,6 @@ const initialState: QuizState = {
   selectedAnswer: null,
   userAnswers: [],
   score: 0,
-  startTime: 0,
   statsUpdated: false,
 };
 
@@ -72,7 +70,6 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
         ...state,
         status: 'playing',
         questions: action.payload.questions,
-        startTime: Date.now(),
       };
     case 'SELECT_ANSWER':
       return { ...state, selectedAnswer: action.payload.answerIndex };
@@ -119,7 +116,8 @@ export function QuizClient() {
   const { t, language } = useLocale();
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(quizReducer, initialState);
-  const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, startTime, statsUpdated } = state;
+  const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, statsUpdated } = state;
+  const startTimeRef = useRef<number>(0);
   
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
   const { toast } = useToast();
@@ -127,6 +125,7 @@ export function QuizClient() {
   // This function now loads questions from the static data file based on language.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
+    startTimeRef.current = Date.now();
 
     // Simulate a brief loading period for a better user experience.
     setTimeout(() => {
@@ -157,7 +156,7 @@ export function QuizClient() {
   // This effect runs once when the game is finished to update the user's stats.
   useEffect(() => {
     if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
-        const playtimeInSeconds = startTime > 0 ? Math.round((Date.now() - startTime) / 1000) : 0;
+        const playtimeInSeconds = startTimeRef.current > 0 ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
         const existingStats = user.stats.games.Quiz;
         const totalCorrect = (existingStats.totalCorrect || 0) + score;
         const totalQuestions = (existingStats.totalQuestions || 0) + questions.length;
@@ -173,7 +172,7 @@ export function QuizClient() {
         });
         dispatch({ type: 'STATS_UPDATED' });
     }
-  }, [status, questions, score, startTime, statsUpdated, user, updateUserStats]);
+  }, [status, questions, score, statsUpdated, user, updateUserStats]);
 
   // Render the lobby screen.
   if (status === "lobby") {

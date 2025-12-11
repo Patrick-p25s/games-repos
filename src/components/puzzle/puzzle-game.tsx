@@ -94,29 +94,31 @@ export function PuzzleGame() {
   const [statsUpdated, setStatsUpdated] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>();
   const gameImage = useMemo(() => PlaceHolderImages.find(img => img.id === 'puzzle'), []);
+  const startTimeRef = useRef<number>(0);
 
-  const endGame = useCallback(() => {
+
+  const endGame = useCallback((won: boolean) => {
+    setIsWon(won);
     setGameState('over');
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated) {
-        if(user) {
-            const score = isWon ? Math.max(0, 10000 - (moves * 10) - time) : 0;
-            const existingStats = user.stats.games.Puzzle;
-            const newBestTime = isWon && (existingStats.bestTime === 0 || time < existingStats.bestTime) ? time : existingStats.bestTime;
-            
-            updateUserStats('Puzzle', {
-                gamesPlayed: existingStats.gamesPlayed + 1,
-                highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: time, // Pass playtime in seconds
-                bestTime: newBestTime,
-            });
-            setStatsUpdated(true);
-        }
+    if (gameState === 'over' && !statsUpdated && user) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+        const score = isWon ? Math.max(0, 10000 - (moves * 10) - playtimeInSeconds) : 0;
+        const existingStats = user.stats.games.Puzzle;
+        const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
+        
+        updateUserStats('Puzzle', {
+            gamesPlayed: existingStats.gamesPlayed + 1,
+            highScore: Math.max(existingStats.highScore, score),
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            bestTime: newBestTime,
+        });
+        setStatsUpdated(true);
     }
-  }, [gameState, moves, time, isWon, user, statsUpdated, updateUserStats]);
+  }, [gameState, moves, isWon, user, statsUpdated, updateUserStats]);
 
   useEffect(() => {
     const { grid: newGrid, emptyPos: newEmptyPos } = createGrid();
@@ -145,6 +147,7 @@ export function PuzzleGame() {
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
+    startTimeRef.current = Date.now();
   }, []);
 
   const handleTileClick = (row: number, col: number) => {
@@ -161,8 +164,7 @@ export function PuzzleGame() {
       setMoves(prevMoves => prevMoves + 1);
 
       if (isSolved(newGrid)) {
-        setIsWon(true);
-        endGame();
+        endGame(true);
       }
     }
   };
@@ -301,7 +303,5 @@ export function PuzzleGame() {
     </div>
   );
 }
-
-    
 
     

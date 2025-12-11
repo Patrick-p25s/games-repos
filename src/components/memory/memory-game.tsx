@@ -48,6 +48,7 @@ export function MemoryGame() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'memory');
+  const startTimeRef = useRef<number>(0);
 
 
   const generateCards = useCallback(() => {
@@ -62,28 +63,28 @@ export function MemoryGame() {
     }));
   }, []);
   
-  const endGame = useCallback(() => {
+  const endGame = useCallback((won: boolean) => {
+    setIsWon(won);
     setGameState('over');
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
   
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated) {
-        if (user) {
-            const score = isWon ? Math.max(0, 10000 - (moves * 10) - (time * 5)) : 0;
-            const existingStats = user.stats.games.Memory;
-            const newBestTime = isWon && (existingStats.bestTime === 0 || time < existingStats.bestTime) ? time : existingStats.bestTime;
-            
-            updateUserStats('Memory', {
-                gamesPlayed: existingStats.gamesPlayed + 1,
-                highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: time, // Pass playtime in seconds
-                bestTime: newBestTime,
-            });
-            setStatsUpdated(true);
-        }
+    if (gameState === 'over' && !statsUpdated && user) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+        const score = isWon ? Math.max(0, 10000 - (moves * 10) - (playtimeInSeconds * 5)) : 0;
+        const existingStats = user.stats.games.Memory;
+        const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
+        
+        updateUserStats('Memory', {
+            gamesPlayed: existingStats.gamesPlayed + 1,
+            highScore: Math.max(existingStats.highScore, score),
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            bestTime: newBestTime,
+        });
+        setStatsUpdated(true);
     }
-  }, [gameState, moves, time, isWon, user, statsUpdated, updateUserStats]);
+  }, [gameState, moves, isWon, user, statsUpdated, updateUserStats]);
 
   useEffect(() => {
     setCards(generateCards());
@@ -97,6 +98,7 @@ export function MemoryGame() {
     setIsWon(false);
     setStatsUpdated(false);
     setGameState('playing');
+    startTimeRef.current = Date.now();
   }, [generateCards]);
 
   useEffect(() => {
@@ -138,8 +140,7 @@ export function MemoryGame() {
         setFlippedCards([]);
 
         if (matchedCards.every(c => c.isMatched)) {
-            setIsWon(true);
-            endGame();
+            endGame(true);
         }
 
       } else {
@@ -275,7 +276,5 @@ export function MemoryGame() {
     </div>
   );
 }
-
-    
 
     

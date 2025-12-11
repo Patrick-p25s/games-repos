@@ -34,6 +34,8 @@ export function SnakeGame() {
   const gameLoopRef = useRef<NodeJS.Timeout>();
   const timerRef = useRef<NodeJS.Timeout>();
   const gameImage = PlaceHolderImages.find(img => img.id === 'snake');
+  const startTimeRef = useRef<number>(0);
+
 
   const endGame = useCallback(() => {
     if (gameState === 'over') return;
@@ -43,22 +45,21 @@ export function SnakeGame() {
   }, [gameState]);
 
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated) {
-        if(user) {
-            const existingStats = user.stats.games.Snake;
-            if (score > existingStats.highScore) {
-              setHighScore(score);
-            }
-            updateUserStats('Snake', {
-                gamesPlayed: existingStats.gamesPlayed + 1,
-                highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: time, // Pass playtime in seconds
-                applesEaten: (existingStats.applesEaten || 0) + (score / 10),
-            });
-            setStatsUpdated(true);
+    if (gameState === 'over' && !statsUpdated && user) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+        const existingStats = user.stats.games.Snake;
+        if (score > existingStats.highScore) {
+          setHighScore(score);
         }
+        updateUserStats('Snake', {
+            gamesPlayed: existingStats.gamesPlayed + 1,
+            highScore: Math.max(existingStats.highScore, score),
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            applesEaten: (existingStats.applesEaten || 0) + (score / 10),
+        });
+        setStatsUpdated(true);
     }
-  }, [gameState, score, time, user, updateUserStats, statsUpdated]);
+  }, [gameState, score, user, updateUserStats, statsUpdated]);
 
 
   useEffect(() => {
@@ -92,6 +93,7 @@ export function SnakeGame() {
   const startGame = useCallback(() => {
     resetGame();
     setGameState('playing');
+    startTimeRef.current = Date.now();
   }, [resetGame]);
 
   const moveSnake = useCallback(() => {
@@ -317,7 +319,5 @@ export function SnakeGame() {
     </div>
   );
 }
-
-    
 
     

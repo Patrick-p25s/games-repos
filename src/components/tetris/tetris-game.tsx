@@ -48,6 +48,8 @@ export function TetrisGame() {
   const [time, setTime] = useState(0);
   const [statsUpdated, setStatsUpdated] = useState(false);
   const gameImage = PlaceHolderImages.find(img => img.id === 'tetris');
+  const startTimeRef = useRef<number>(0);
+
 
   const [activePiece, setActivePiece] = useState({
       pos: { x: 0, y: 0 },
@@ -71,19 +73,18 @@ export function TetrisGame() {
   }, [gameState]);
 
   useEffect(() => {
-    if (gameState === 'over' && !statsUpdated) {
-        if(user) {
-            const existingStats = user.stats.games.Tetris;
-            updateUserStats('Tetris', {
-                gamesPlayed: existingStats.gamesPlayed + 1,
-                highScore: Math.max(existingStats.highScore, score),
-                totalPlaytime: time, // Pass playtime in seconds
-                linesCleared: existingStats.linesCleared + linesCleared,
-            });
-            setStatsUpdated(true);
-        }
+    if (gameState === 'over' && !statsUpdated && user) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+        const existingStats = user.stats.games.Tetris;
+        updateUserStats('Tetris', {
+            gamesPlayed: existingStats.gamesPlayed + 1,
+            highScore: Math.max(existingStats.highScore, score),
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
+            linesCleared: existingStats.linesCleared + linesCleared,
+        });
+        setStatsUpdated(true);
     }
-  }, [gameState, score, linesCleared, time, user, updateUserStats, statsUpdated]);
+  }, [gameState, score, linesCleared, user, updateUserStats, statsUpdated]);
 
   const resetGame = useCallback(() => {
     const newPieceTetromino = randomTetromino();
@@ -107,6 +108,7 @@ export function TetrisGame() {
   const startGame = useCallback(() => {
     resetGame();
     setGameState('playing');
+    startTimeRef.current = Date.now();
   }, [resetGame]);
 
   const isValidMove = (shape: number[][], pos: {x: number, y: number}, currentBoard: Board): boolean => {
@@ -134,6 +136,7 @@ export function TetrisGame() {
       } else {
         // Lock piece
         const newBoard = board.map(row => row.map(cell => ({...cell})));
+        let gameOver = false;
         prev.shape.forEach((row, y) => {
             row.forEach((value, x) => {
                 if (value) {
@@ -142,9 +145,17 @@ export function TetrisGame() {
                     if(boardY < ROWS && boardX < COLS) {
                         newBoard[boardY][boardX] = { filled: true, color: prev.tetromino.color };
                     }
+                    if (boardY < 0) { // Piece locked above the board
+                        gameOver = true;
+                    }
                 }
             });
         });
+
+        if (gameOver) {
+            endGame();
+            return prev;
+        }
 
         // Clear lines
         let clearedRowCount = 0;
@@ -190,7 +201,7 @@ export function TetrisGame() {
 
   useEffect(() => {
     if (gameState === 'playing') {
-      const gameSpeed = 1000 / level;
+      const gameSpeed = Math.max(100, 1000 - (level - 1) * 50);
       gameLoopRef.current = setInterval(drop, gameSpeed);
       
       timerRef.current = setInterval(() => {
@@ -267,7 +278,7 @@ export function TetrisGame() {
         if (value) {
             const boardY = activePiece.pos.y + y;
             const boardX = activePiece.pos.x + x;
-            if (boardY < ROWS && boardX < COLS) {
+            if (boardY >= 0 && boardY < ROWS && boardX >=0 && boardX < COLS) {
                 newBoard[boardY][boardX] = { filled: true, color: activePiece.tetromino.color };
             }
         }
@@ -407,7 +418,5 @@ export function TetrisGame() {
     </div>
   );
 }
-
-    
 
     
