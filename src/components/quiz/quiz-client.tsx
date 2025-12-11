@@ -131,7 +131,7 @@ export function QuizClient() {
     // Simulate a brief loading period for a better user experience.
     setTimeout(() => {
       const languageQuestions = staticQuizData[language];
-      const shuffledQuestions = shuffleArray(languageQuestions).slice(0, 10);
+      const shuffledQuestions = shuffleArray(languageQuestions).slice(0, 15);
       dispatch({ type: 'START_QUIZ', payload: { questions: shuffledQuestions }});
     }, 500);
 
