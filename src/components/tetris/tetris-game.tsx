@@ -12,10 +12,12 @@ import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 
-const COLS = 10;
-const ROWS = 20;
-const BLOCK_SIZE = 25; // Adjusted for mobile
+// Constantes du jeu Tetris.
+const COLS = 10; // Nombre de colonnes de la grille.
+const ROWS = 20; // Nombre de lignes de la grille.
+const BLOCK_SIZE = 25; // Taille de chaque bloc en pixels, ajustée pour les mobiles.
 
+// Définition des formes des tétrominos et de leurs couleurs.
 const TETROMINOS = {
   'I': { shape: [[1, 1, 1, 1]], color: 'bg-cyan-500 border-cyan-300' },
   'J': { shape: [[0, 1, 0], [0, 1, 0], [1, 1, 0]], color: 'bg-blue-600 border-blue-400' },
@@ -35,6 +37,7 @@ type Cell = {
 }
 type Board = Cell[][];
 
+// Crée un tableau de jeu vide.
 const createEmptyBoard = (): Board => Array.from({ length: ROWS }, () => Array(COLS).fill({ filled: false, color: '' }));
 
 export function TetrisGame() {
@@ -59,12 +62,14 @@ export function TetrisGame() {
   const gameLoopRef = useRef<NodeJS.Timeout>();
   const timerRef = useRef<NodeJS.Timeout>();
 
+  // Sélectionne un tétromino au hasard.
   const randomTetromino = useCallback((): { shape: number[][], color: string } => {
     const keys = Object.keys(TETROMINOS) as TetrominoKey[];
     const randKey = keys[Math.floor(Math.random() * keys.length)];
     return TETROMINOS[randKey];
   }, []);
 
+  // Met fin à la partie.
   const endGame = useCallback(() => {
     if(gameState === 'over') return;
     setGameState('over');
@@ -72,6 +77,7 @@ export function TetrisGame() {
     if (timerRef.current) clearInterval(timerRef.current);
   }, [gameState]);
 
+  // Met à jour les statistiques du joueur à la fin de la partie.
   useEffect(() => {
     if (gameState === 'over' && !statsUpdated && user) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
@@ -79,13 +85,14 @@ export function TetrisGame() {
         updateUserStats('Tetris', {
             gamesPlayed: existingStats.gamesPlayed + 1,
             highScore: Math.max(existingStats.highScore, score),
-            totalPlaytime: playtimeInSeconds,
+            totalPlaytime: existingStats.totalPlaytime + playtimeInSeconds,
             linesCleared: linesCleared,
         });
         setStatsUpdated(true);
     }
   }, [gameState, score, linesCleared, user, updateUserStats, statsUpdated]);
 
+  // Réinitialise l'état du jeu pour une nouvelle partie.
   const resetGame = useCallback(() => {
     const newPieceTetromino = randomTetromino();
     setActivePiece({
@@ -105,12 +112,14 @@ export function TetrisGame() {
     resetGame();
   }, [resetGame])
 
+  // Démarre la partie.
   const startGame = useCallback(() => {
     resetGame();
     setGameState('playing');
     startTimeRef.current = Date.now();
   }, [resetGame]);
 
+  // Vérifie si un mouvement est valide.
   const isValidMove = (shape: number[][], pos: {x: number, y: number}, currentBoard: Board): boolean => {
     for (let y = 0; y < shape.length; y++) {
         for (let x = 0; x < shape[y].length; x++) {
@@ -126,6 +135,7 @@ export function TetrisGame() {
     return true;
   };
   
+  // Fonction de chute de la pièce.
   const drop = useCallback(() => {
     if (gameState !== 'playing') return;
 
@@ -134,7 +144,7 @@ export function TetrisGame() {
       if (isValidMove(prev.shape, nextPos, board)) {
         return { ...prev, pos: nextPos };
       } else {
-        // Lock piece
+        // Verrouille la pièce en place.
         const newBoard = board.map(row => row.map(cell => ({...cell})));
         let gameOver = false;
         prev.shape.forEach((row, y) => {
@@ -145,7 +155,7 @@ export function TetrisGame() {
                     if(boardY < ROWS && boardX < COLS) {
                         newBoard[boardY][boardX] = { filled: true, color: prev.tetromino.color };
                     }
-                    if (boardY < 0) { // Piece locked above the board
+                    if (boardY < 0) { // La pièce est verrouillée au-dessus du tableau.
                         gameOver = true;
                     }
                 }
@@ -157,7 +167,7 @@ export function TetrisGame() {
             return prev;
         }
 
-        // Clear lines
+        // Vérifie et efface les lignes complétées.
         let clearedRowCount = 0;
         let tempBoard = [...newBoard];
         let linesToClear = [];
@@ -181,6 +191,7 @@ export function TetrisGame() {
             setBoard(newBoard);
         }
         
+        // Génère une nouvelle pièce.
         const newPieceTetromino = randomTetromino();
         const newPiece = {
             pos: { x: Math.floor(COLS / 2) - 1, y: 0 },
@@ -190,7 +201,6 @@ export function TetrisGame() {
 
         if (!isValidMove(newPiece.shape, newPiece.pos, tempBoard)) {
             endGame();
-            // Return previous piece to avoid setting an invalid one
             return prev;
         } else {
             return newPiece;
@@ -199,12 +209,14 @@ export function TetrisGame() {
     });
   }, [board, endGame, level, randomTetromino, gameState]);
 
+  // Augmente le niveau toutes les 10 lignes effacées.
   useEffect(() => {
     if(linesCleared > 0 && linesCleared % 10 === 0) {
         setLevel(l => l + 1);
     }
   }, [linesCleared])
 
+  // Gère la boucle de jeu principale et le minuteur.
   useEffect(() => {
     if (gameState === 'playing') {
       const gameSpeed = Math.max(100, 1000 - (level - 1) * 50);
@@ -221,6 +233,7 @@ export function TetrisGame() {
     }
   }, [gameState, drop, level]);
 
+  // Déplace la pièce horizontalement.
   const move = (dir: -1 | 1) => {
     if (gameState !== 'playing') return;
     setActivePiece(prev => {
@@ -232,6 +245,7 @@ export function TetrisGame() {
     });
   };
 
+  // Fait pivoter la pièce.
   const rotate = () => {
     if (gameState !== 'playing') return;
     setActivePiece(prev => {
@@ -244,6 +258,7 @@ export function TetrisGame() {
     });
   };
 
+  // Fait tomber la pièce instantanément (hard drop).
   const hardDrop = () => {
     if (gameState !== 'playing') return;
     let droppedPiece = { ...activePiece };
@@ -253,15 +268,13 @@ export function TetrisGame() {
     
     setActivePiece(droppedPiece);
 
-    // Use a timeout to trigger the drop and lock mechanism after the state has updated
+    // Utilise un timeout pour s'assurer que la chute et le verrouillage s'exécutent après la mise à jour de l'état.
     setTimeout(() => {
-      if (gameLoopRef.current) {
-          clearInterval(gameLoopRef.current);
-      }
       drop();
     }, 0);
   };
 
+  // Gère les entrées clavier.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (gameState !== 'playing') return;
@@ -275,8 +288,9 @@ export function TetrisGame() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, drop]);
+  }, [gameState, drop, hardDrop]); // Ajout de hardDrop ici
 
+  // Crée le tableau d'affichage en combinant le tableau de jeu et la pièce active.
   const displayBoard = (): Board => {
     const newBoard = board.map(row => row.map(cell => ({...cell})));
     activePiece.shape.forEach((row, y) => {
@@ -293,6 +307,7 @@ export function TetrisGame() {
     return newBoard;
   };
   
+  // Affiche l'écran d'accueil du jeu.
   if (gameState === 'lobby') {
     return (
       <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
@@ -329,17 +344,18 @@ export function TetrisGame() {
     );
   }
 
+  // Affiche l'écran de fin de partie.
   if (gameState === 'over') {
     return (
         <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-8">
              <Card className="w-full max-w-sm animate-in fade-in-500 duration-500 text-center">
                 <CardHeader>
-                    <CardTitle className="text-3xl font-bold text-red-500 font-headline">{t('gameOver')}</CardTitle>
+                    <CardTitle className="text-3xl font-bold text-destructive font-headline">{t('gameOver')}</CardTitle>
                     <CardDescription className="text-lg">{t('yourScore')}: <span className="font-bold">{score}</span></CardDescription>
                 </CardHeader>
                 <CardContent>
-                   <p className="text-md text-gray-600 dark:text-gray-400">{t('level')}: <span className="font-bold">{level}</span></p>
-                   <p className="text-md text-gray-600 dark:text-gray-400">{t('linesCleared')}: <span className="font-bold">{linesCleared}</span></p>
+                   <p className="text-md text-muted-foreground">{t('level')}: <span className="font-bold">{level}</span></p>
+                   <p className="text-md text-muted-foreground">{t('linesCleared')}: <span className="font-bold">{linesCleared}</span></p>
                 </CardContent>
                 <CardContent className="flex flex-col gap-4">
                     <Button onClick={startGame} size="lg">
@@ -358,9 +374,11 @@ export function TetrisGame() {
     )
   }
   
+  // Formate le temps pour l'affichage.
   const minutes = Math.floor(time / 60).toString().padStart(2, '0');
   const seconds = (time % 60).toString().padStart(2, '0');
 
+  // Affiche l'écran de jeu principal.
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 py-8 bg-background text-foreground">
         <div className="w-full max-w-sm text-center">
@@ -424,5 +442,3 @@ export function TetrisGame() {
     </div>
   );
 }
-
-    
