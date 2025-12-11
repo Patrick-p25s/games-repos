@@ -18,13 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Check, Loader2, Play, Home, X, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useReducer } from "react";
 import { useLocale } from "@/contexts/locale-context";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
 
-type QuizState = "lobby" | "loading" | "playing" | "finished";
+type QuizStatus = "lobby" | "loading" | "playing" | "finished";
 type Question = GenerateQuizQuestionsOutput["questions"][0];
 
 // Add a label component to be used with RadioGroup
@@ -32,42 +32,115 @@ const Label = ({ htmlFor, className, children }: {htmlFor: string; className: st
     <label htmlFor={htmlFor} className={className}>{children}</label>
 )
 
+type QuizState = {
+  status: QuizStatus;
+  questions: Question[];
+  currentQuestionIndex: number;
+  selectedAnswer: number | null;
+  userAnswers: (number | null)[];
+  score: number;
+  startTime: number;
+  statsUpdated: boolean;
+};
+
+const initialState: QuizState = {
+  status: 'lobby',
+  questions: [],
+  currentQuestionIndex: 0,
+  selectedAnswer: null,
+  userAnswers: [],
+  score: 0,
+  startTime: 0,
+  statsUpdated: false,
+};
+
+type QuizAction =
+  | { type: 'START_LOADING' }
+  | { type: 'START_QUIZ'; payload: { questions: Question[] } }
+  | { type: 'API_ERROR' }
+  | { type: 'SELECT_ANSWER'; payload: { answerIndex: number } }
+  | { type: 'NEXT_QUESTION' }
+  | { type: 'FINISH_QUIZ' }
+  | { type: 'STATS_UPDATED' }
+  | { type: 'RESTART' };
+
+function quizReducer(state: QuizState, action: QuizAction): QuizState {
+  switch (action.type) {
+    case 'START_LOADING':
+      return { ...initialState, status: 'loading' };
+    case 'START_QUIZ':
+      return {
+        ...state,
+        status: 'playing',
+        questions: action.payload.questions,
+        startTime: Date.now(),
+      };
+    case 'API_ERROR':
+      return { ...state, status: 'lobby' };
+    case 'SELECT_ANSWER':
+      return { ...state, selectedAnswer: action.payload.answerIndex };
+    case 'NEXT_QUESTION': {
+      const isCorrect = state.selectedAnswer === state.questions[state.currentQuestionIndex].correctAnswerIndex;
+      const newAnswers = [...state.userAnswers];
+      newAnswers[state.currentQuestionIndex] = state.selectedAnswer;
+
+      return {
+        ...state,
+        score: isCorrect ? state.score + 1 : state.score,
+        userAnswers: newAnswers,
+        currentQuestionIndex: state.currentQuestionIndex + 1,
+        selectedAnswer: null,
+      };
+    }
+    case 'FINISH_QUIZ': {
+      const isCorrect = state.selectedAnswer === state.questions[state.currentQuestionIndex].correctAnswerIndex;
+      const newAnswers = [...state.userAnswers];
+      newAnswers[state.currentQuestionIndex] = state.selectedAnswer;
+        
+      return {
+        ...state,
+        status: 'finished',
+        score: isCorrect ? state.score + 1 : state.score,
+        userAnswers: newAnswers,
+      };
+    }
+    case 'STATS_UPDATED':
+      return { ...state, statsUpdated: true };
+    case 'RESTART':
+      return { ...initialState, status: 'lobby' };
+    default:
+      return state;
+  }
+}
 
 export function QuizClient() {
   const { t } = useLocale();
   const { user, updateUserStats } = useAuth();
-  const [quizState, setQuizState] = useState<QuizState>("lobby");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
-  const [score, setScore] = useState(0);
-  const [startTime, setStartTime] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
+  const [state, dispatch] = useReducer(quizReducer, initialState);
+  const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, startTime, statsUpdated } = state;
+  
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
 
   const { toast } = useToast();
 
   const loadQuiz = useCallback(async () => {
-    setQuizState("loading");
-    setCurrentQuestionIndex(0);
-    setScore(0);
-    setUserAnswers([]);
-    setSelectedAnswer(null);
-    setStatsUpdated(false);
+    dispatch({ type: 'START_LOADING' });
 
     try {
-      toast({ title: t('letsTryQuiz'), description: `${t('topic')}: General Knowledge` });
+      toast({ title: t('generatingQuiz'), description: `${t('topic')}: General Knowledge` });
 
       const quizData = await generateQuizQuestions({
         topic: "General Knowledge",
         difficulty: "easy",
         numQuestions: 10,
       });
+      
+      if (!quizData || !quizData.questions || quizData.questions.length === 0) {
+        throw new Error("Generated quiz data is invalid.");
+      }
 
-      setQuestions(quizData.questions);
-      setStartTime(Date.now());
-      setQuizState("playing");
+      dispatch({ type: 'START_QUIZ', payload: { questions: quizData.questions }});
+
     } catch (error) {
       console.error("Failed to load quiz:", error);
       toast({
@@ -75,7 +148,7 @@ export function QuizClient() {
         title: t('error'),
         description: t('quizGenerationError'),
       });
-      setQuizState("lobby");
+      dispatch({ type: 'API_ERROR' });
     }
   }, [t, toast]);
 
@@ -88,30 +161,20 @@ export function QuizClient() {
       });
       return;
     }
-
-    const isCorrect = selectedAnswer === questions[currentQuestionIndex].correctAnswerIndex;
-    if (isCorrect) {
-      setScore(score + 1);
-    }
-
-    const newAnswers = [...userAnswers];
-    newAnswers[currentQuestionIndex] = selectedAnswer;
-    setUserAnswers(newAnswers);
     
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setSelectedAnswer(null);
+      dispatch({ type: 'NEXT_QUESTION' });
     } else {
-      setQuizState("finished");
+      dispatch({ type: 'FINISH_QUIZ' });
     }
   };
   
   useEffect(() => {
-    if (quizState === 'finished' && user && questions.length > 0 && !statsUpdated) {
+    if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
         const playtime = startTime > 0 ? Math.round((Date.now() - startTime) / 60000) : 0;
         const existingStats = user.stats.games.Quiz;
-        const totalCorrect = existingStats.totalCorrect + score;
-        const totalQuestions = existingStats.totalQuestions + questions.length;
+        const totalCorrect = (existingStats.totalCorrect || 0) + score;
+        const totalQuestions = (existingStats.totalQuestions || 0) + questions.length;
         const newAvgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
         updateUserStats('Quiz', {
@@ -122,12 +185,11 @@ export function QuizClient() {
             totalCorrect,
             totalQuestions,
         });
-        setStatsUpdated(true);
+        dispatch({ type: 'STATS_UPDATED' });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quizState, questions, score, startTime, statsUpdated, user, updateUserStats]);
+  }, [status, questions, score, startTime, statsUpdated, user, updateUserStats]);
 
-  if (quizState === "lobby") {
+  if (status === "lobby") {
     return (
       <div className="container flex flex-col items-center justify-center min-h-screen py-8">
         <Card className="w-full max-w-md text-center shadow-lg">
@@ -163,7 +225,7 @@ export function QuizClient() {
     );
   }
 
-  if (quizState === "loading") {
+  if (status === "loading") {
     return (
       <div className="container py-12 flex justify-center items-center min-h-[calc(100vh-10rem)]">
         <div className="flex flex-col items-center gap-4">
@@ -174,7 +236,7 @@ export function QuizClient() {
     );
   }
 
-  if (quizState === "finished") {
+  if (status === "finished") {
     return (
         <div className="container py-12 flex justify-center">
             <Card className="w-full max-w-3xl text-center">
@@ -237,7 +299,7 @@ export function QuizClient() {
           <CardContent>
             <RadioGroup
               value={selectedAnswer !== null ? String(selectedAnswer) : ""}
-              onValueChange={(val) => setSelectedAnswer(Number(val))}
+              onValueChange={(val) => dispatch({ type: 'SELECT_ANSWER', payload: { answerIndex: Number(val) }})}
               className="space-y-4"
             >
               {currentQuestion.options.map((option, index) => (
