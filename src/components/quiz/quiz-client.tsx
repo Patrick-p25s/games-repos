@@ -1,8 +1,6 @@
 
 "use client";
 
-import { generateQuizQuestions } from "@/ai/flows/generate-quiz-questions";
-import type { GenerateQuizQuestionsOutput } from "@/ai/flows/generate-quiz-questions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,9 +21,9 @@ import { useLocale } from "@/contexts/locale-context";
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
+import { staticQuizData, type QuizQuestion } from '@/lib/static-quiz-data';
 
 type QuizStatus = "lobby" | "loading" | "playing" | "finished";
-type Question = GenerateQuizQuestionsOutput["questions"][0];
 
 // ShadCN UI is missing a Label component for the RadioGroup, so we define a simple one here.
 const Label = ({ htmlFor, className, children }: {htmlFor: string; className: string; children: React.ReactNode}) => (
@@ -35,7 +33,7 @@ const Label = ({ htmlFor, className, children }: {htmlFor: string; className: st
 // Using a reducer helps manage complex state transitions more reliably.
 type QuizState = {
   status: QuizStatus;
-  questions: Question[];
+  questions: QuizQuestion[];
   currentQuestionIndex: number;
   selectedAnswer: number | null;
   userAnswers: (number | null)[];
@@ -58,8 +56,7 @@ const initialState: QuizState = {
 
 type QuizAction =
   | { type: 'START_LOADING' }
-  | { type: 'START_QUIZ'; payload: { questions: Question[] } }
-  | { type: 'API_ERROR' }
+  | { type: 'START_QUIZ'; payload: { questions: QuizQuestion[] } }
   | { type: 'SELECT_ANSWER'; payload: { answerIndex: number } }
   | { type: 'NEXT_QUESTION' }
   | { type: 'FINISH_QUIZ' }
@@ -77,8 +74,6 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
         questions: action.payload.questions,
         startTime: Date.now(),
       };
-    case 'API_ERROR':
-      return { ...state, status: 'lobby' };
     case 'SELECT_ANSWER':
       return { ...state, selectedAnswer: action.payload.answerIndex };
     case 'NEXT_QUESTION': {
@@ -115,6 +110,11 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
   }
 }
 
+// Helper function to shuffle an array
+function shuffleArray<T>(array: T[]): T[] {
+    return [...array].sort(() => Math.random() - 0.5);
+}
+
 export function QuizClient() {
   const { t } = useLocale();
   const { user, updateUserStats } = useAuth();
@@ -124,36 +124,17 @@ export function QuizClient() {
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
   const { toast } = useToast();
 
-  // This function calls the AI flow to generate quiz questions.
+  // This function now loads questions from the static data file.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
 
-    try {
-      toast({ title: t('generatingQuiz'), description: `${t('topic')}: General Knowledge` });
+    // Simulate a brief loading period for a better user experience.
+    setTimeout(() => {
+      const shuffledQuestions = shuffleArray(staticQuizData).slice(0, 10);
+      dispatch({ type: 'START_QUIZ', payload: { questions: shuffledQuestions }});
+    }, 500);
 
-      const quizData = await generateQuizQuestions({
-        topic: "General Knowledge",
-        difficulty: "easy",
-        numQuestions: 10,
-      });
-      
-      // Basic validation to ensure the AI returned valid data.
-      if (!quizData || !quizData.questions || quizData.questions.length === 0) {
-        throw new Error("Generated quiz data is invalid.");
-      }
-
-      dispatch({ type: 'START_QUIZ', payload: { questions: quizData.questions }});
-
-    } catch (error) {
-      console.error("Failed to load quiz:", error);
-      toast({
-        variant: "destructive",
-        title: t('error'),
-        description: t('quizGenerationError'),
-      });
-      dispatch({ type: 'API_ERROR' });
-    }
-  }, [t, toast]);
+  }, []);
 
   const handleNextQuestion = () => {
     if (selectedAnswer === null) {
@@ -230,7 +211,7 @@ export function QuizClient() {
     );
   }
 
-  // Render a loading spinner while waiting for the AI.
+  // Render a loading spinner while shuffling questions.
   if (status === "loading") {
     return (
       <div className="container py-12 flex justify-center items-center min-h-[calc(100vh-10rem)]">
@@ -337,3 +318,5 @@ export function QuizClient() {
     </div>
   );
 }
+
+    
