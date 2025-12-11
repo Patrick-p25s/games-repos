@@ -9,7 +9,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 
@@ -329,8 +329,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const resetStats = async () => {
     if (!user || !db) return;
-    await updateDoc(doc(db, 'users', user.id), { stats: defaultStats }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: doc(db, 'users', user.id).path, operation: 'update', requestResourceData: { stats: defaultStats } });
+    const userDocRef = doc(db, 'users', user.id);
+    await updateDoc(userDocRef, { stats: defaultStats }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: defaultStats } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
@@ -382,8 +383,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteMessage = async (messageId: string) => {
     if (!user || !db) return;
     const updatedInbox = user.inbox.filter(msg => msg.id !== messageId);
-    await updateDoc(doc(db, 'users', user.id), { inbox: updatedInbox }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: doc(db, 'users', user.id).path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
+    const userDocRef = doc(db, 'users', user.id);
+    await updateDoc(userDocRef, { inbox: updatedInbox }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
@@ -393,8 +395,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const markMessageAsRead = async (messageId: string) => {
     if (!user || !db) return;
     const updatedInbox = user.inbox.map(msg => msg.id === messageId ? {...msg, read: true} : msg);
-    await updateDoc(doc(db, 'users', user.id), { inbox: updatedInbox }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: doc(db, 'users', user.id).path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
+    const userDocRef = doc(db, 'users', user.id);
+    await updateDoc(userDocRef, { inbox: updatedInbox }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });

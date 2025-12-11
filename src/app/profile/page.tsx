@@ -92,8 +92,8 @@ function Inbox() {
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
             {user.inbox.map((msg) => (
-                <AccordionItem value={msg.id} key={msg.id} onFocus={() => !msg.read && handleMarkAsRead(msg.id)}>
-                    <AccordionTrigger>
+                <AccordionItem value={msg.id} key={msg.id}>
+                    <AccordionTrigger onFocus={() => !msg.read && handleMarkAsRead(msg.id)}>
                         <div className={cn("flex justify-between w-full pr-4 items-center", !msg.read && "font-bold")}>
                             <span className="text-left">{msg.subject}</span>
                             <span className="text-sm text-muted-foreground ml-4 shrink-0">{new Date(msg.date).toLocaleDateString()}</span>
