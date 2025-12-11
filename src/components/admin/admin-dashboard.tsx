@@ -87,7 +87,7 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
           description: t('replySentMessage', { name: feedbackItem.name }),
         });
         form.reset();
-        setOpen(false);
+        setOpen(false); // This line closes the dialog
     }
 
     return (

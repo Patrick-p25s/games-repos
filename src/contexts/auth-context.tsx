@@ -105,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // On initial mount, load all data from localStorage.
   useEffect(() => {
     try {
+      // Clear all data on first load for a fresh start
+      if (typeof window !== 'undefined') {
+          localStorage.clear();
+      }
+
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
       if (storedAllUsers) {
         // Ensure data integrity on load
@@ -280,64 +285,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const feedbackToDelete = allFeedback.find(f => f.id === feedbackId);
     if (!feedbackToDelete) return;
 
-    setAllFeedback(currentFeedback => {
-        const updatedFeedback = currentFeedback.filter(f => f.id !== feedbackId);
-        saveFeedback(updatedFeedback);
-        return updatedFeedback;
-    });
+    // Remove the feedback item from the admin's view
+    const updatedFeedback = allFeedback.filter(f => f.id !== feedbackId);
+    saveFeedback(updatedFeedback);
 
-    // Also delete the reply from the user's inbox if it exists
-    setAllUsers(currentUsers => {
-      const usersCopy = [...currentUsers];
-      const userIndex = usersCopy.findIndex(u => u.id === feedbackToDelete.userId);
-
-      if (userIndex > -1) {
-        const targetUser = { ...usersCopy[userIndex] };
-        targetUser.inbox = (targetUser.inbox || []).filter(msg => msg.subject !== `Re: ${feedbackToDelete.subject}`);
-        usersCopy[userIndex] = targetUser;
-
-        if (user?.id === targetUser.id) {
-          setUser(targetUser);
-          localStorage.setItem("nextgen-games-user", JSON.stringify(targetUser));
+    // Also remove the corresponding reply from the user's inbox
+    const updatedUsers = allUsers.map(u => {
+        if (u.id === feedbackToDelete.userId) {
+            const userCopy = { ...u };
+            userCopy.inbox = (userCopy.inbox || []).filter(
+                msg => msg.subject !== `Re: ${feedbackToDelete.subject}`
+            );
+            // If the currently logged-in user is the one being updated, update their state as well
+            if (user?.id === u.id) {
+                setUser(userCopy);
+            }
+            return userCopy;
         }
-        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
-      }
-      return usersCopy;
+        return u;
     });
-  }, [allFeedback, saveFeedback, user]);
+    saveAllUsers(updatedUsers);
+}, [allFeedback, allUsers, user, saveFeedback, saveAllUsers]);
 
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
-    setAllUsers(currentUsers => {
-        const usersCopy = [...currentUsers];
-        const userIndex = usersCopy.findIndex(u => u.id === userId);
+    const newInboxMessage: InboxMessage = {
+        id: `msg-${Date.now()}`,
+        subject: `Re: ${subject}`,
+        message,
+        date: new Date().toLocaleDateString('en-CA'),
+    };
 
-        if (userIndex > -1) {
-            const newInboxMessage: InboxMessage = {
-                id: `msg-${Date.now()}`,
-                subject: `Re: ${subject}`,
-                message,
-                date: new Date().toLocaleDateString('en-CA'),
-            };
-            const targetUser = usersCopy[userIndex];
-            
-            // This creates a new user object with a new inbox array.
+    const updatedUsers = allUsers.map(u => {
+        if (u.id === userId) {
             const updatedUser = {
-                ...targetUser,
-                inbox: [newInboxMessage, ...(targetUser.inbox || [])]
+                ...u,
+                inbox: [newInboxMessage, ...(u.inbox || [])],
             };
-
-            usersCopy[userIndex] = updatedUser;
-            
-            // If the logged-in user is the one being updated, update their state too
             if (user?.id === userId) {
-                setUser(updatedUser);
+                setUser(updatedUser); 
             }
+            return updatedUser;
         }
-        // Save the entire updated user list to localStorage
-        localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
-        return usersCopy;
+        return u;
     });
-  }, [user]);
+
+    saveAllUsers(updatedUsers);
+  }, [allUsers, user, saveAllUsers]);
 
   const deleteMessage = useCallback((messageId: string) => {
     if (!user) return;
