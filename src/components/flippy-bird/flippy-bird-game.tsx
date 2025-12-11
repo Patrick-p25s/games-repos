@@ -17,12 +17,12 @@ import { cn } from '@/lib/utils';
 const BIRD_SIZE = 30; // Taille de l'oiseau en pixels.
 const GAME_WIDTH = 400; // Largeur de la zone de jeu.
 const GAME_HEIGHT = 600; // Hauteur de la zone de jeu.
-const GRAVITY = 0.4; // Force de la gravité appliquée à l'oiseau.
+const GRAVITY = 0.3; // Force de la gravité appliquée à l'oiseau.
 const JUMP_STRENGTH = -7; // Puissance du saut de l'oiseau.
 const PIPE_WIDTH = 60; // Largeur des tuyaux.
 const PIPE_GAP = 220; // Espace vertical entre les tuyaux.
-const PIPE_SPEED = 3; // Vitesse de défilement des tuyaux.
-const PIPE_INTERVAL = 3000; // Temps en ms entre l'apparition de nouveaux tuyaux.
+const PIPE_SPEED = 2.5; // Vitesse de défilement des tuyaux.
+const PIPE_INTERVAL = 2000; // Temps en ms entre l'apparition de nouveaux tuyaux.
 
 type GameStatus = 'lobby' | 'ready' | 'playing' | 'over';
 
@@ -122,6 +122,8 @@ export function FlippyBirdGame() {
   
   const [flash, setFlash] = useState(false);
   const [scoreJustIncreased, setScoreJustIncreased] = useState(false);
+  const [statsUpdated, setStatsUpdated] = useState(false);
+
 
   const gameLoopRef = useRef<number>();
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -130,7 +132,6 @@ export function FlippyBirdGame() {
   const lastPipeTimeRef = useRef(0);
   const gameOverTriggeredRef = useRef(false);
   const startTimeRef = useRef<number>(0);
-  const statsUpdatedRef = useRef(false);
 
   useEffect(() => {
     if (score > prevScore.current) {
@@ -145,7 +146,7 @@ export function FlippyBirdGame() {
   // Prépare le jeu pour une nouvelle partie.
   const readyGame = useCallback(() => {
     gameOverTriggeredRef.current = false;
-    statsUpdatedRef.current = false;
+    setStatsUpdated(false);
     dispatch({ type: 'READY_GAME', payload: { highScore: user?.stats.games["Flippy Bird"].highScore || 0 } });
   }, [user]);
 
@@ -247,18 +248,16 @@ export function FlippyBirdGame() {
   
   // Met à jour les statistiques de l'utilisateur à la fin de la partie.
   useEffect(() => {
-    if (status === 'over' && !statsUpdatedRef.current) {
-      if (user) {
-        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-        updateUserStats("Flippy Bird", {
-            highScore: score,
-            totalPlaytime: playtimeInSeconds,
-            pipesPassed: score
-        });
-      }
-      statsUpdatedRef.current = true;
+    if (status === 'over' && user && !statsUpdated) {
+      const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+      updateUserStats("Flippy Bird", {
+          highScore: score,
+          totalPlaytime: playtimeInSeconds,
+          pipesPassed: score
+      });
+      setStatsUpdated(true);
     }
-  }, [status, score, user, updateUserStats]);
+  }, [status, score, user, updateUserStats, statsUpdated]);
 
   // Gère les entrées du clavier et du clic/toucher.
   useEffect(() => {
