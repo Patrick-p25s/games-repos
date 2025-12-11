@@ -82,15 +82,23 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
 
     // Gère la soumission du formulaire de réponse.
     async function onSubmit(values: z.infer<typeof replySchema>) {
-        await sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
-        // Après avoir répondu, nous supprimons l'élément de feedback de la file d'attente de l'admin.
-        await deleteFeedback(feedbackItem.id);
-        toast({
-          title: t('replySent'),
-          description: t('replySentMessage', { name: feedbackItem.name }),
-        });
-        form.reset();
-        setOpen(false); // Ferme la boîte de dialogue après l'envoi.
+        try {
+            await sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
+            // Après avoir répondu, nous supprimons l'élément de feedback de la file d'attente de l'admin.
+            await deleteFeedback(feedbackItem.id);
+            toast({
+              title: t('replySent'),
+              description: t('replySentMessage', { name: feedbackItem.name }),
+            });
+            form.reset();
+            setOpen(false); // Ferme la boîte de dialogue après l'envoi.
+        } catch (error) {
+            toast({
+              variant: "destructive",
+              title: t('error'),
+              description: "Failed to send reply. Please try again.",
+            });
+        }
     }
 
     return (
@@ -177,11 +185,19 @@ export function AdminDashboard() {
 
   // Gère la suppression d'un feedback.
   const handleDeleteFeedback = async (id: string) => {
-    await deleteFeedback(id);
-    toast({
-      title: t('feedbackDeleted'),
-      description: t('feedbackDeletedMessage', { id }),
-    });
+    try {
+        await deleteFeedback(id);
+        toast({
+          title: t('feedbackDeleted'),
+          description: t('feedbackDeletedMessage', { id }),
+        });
+    } catch (error) {
+         toast({
+          variant: "destructive",
+          title: t('error'),
+          description: "Failed to delete feedback. Please try again.",
+        });
+    }
   };
 
   return (

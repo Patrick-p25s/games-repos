@@ -6,7 +6,7 @@ import { UserStats } from "@/components/profile/user-stats";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { LogIn, Mail, MailOpen, Trash2 } from "lucide-react";
+import { LogIn, Mail, MailOpen, Trash2, Eye } from "lucide-react";
 import { useLocale } from "@/contexts/locale-context";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import {
@@ -27,10 +27,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 
 function Inbox() {
-  const { user, deleteMessage } = useAuth();
+  const { user, deleteMessage, markMessageAsRead } = useAuth();
   const { t } = useLocale();
   const { toast } = useToast();
 
@@ -49,6 +50,19 @@ function Inbox() {
         })
     }
   }
+  
+  const handleMarkAsRead = async (messageId: string) => {
+    try {
+      await markMessageAsRead(messageId);
+    } catch(e) {
+         toast({
+            variant: "destructive",
+            title: t('error'),
+            description: "Failed to mark message as read"
+        })
+    }
+  }
+
 
   if (!user || !user.inbox || user.inbox.length === 0) {
     return (
@@ -78,37 +92,45 @@ function Inbox() {
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
             {user.inbox.map((msg) => (
-                <AccordionItem value={msg.id} key={msg.id}>
+                <AccordionItem value={msg.id} key={msg.id} onFocus={() => !msg.read && handleMarkAsRead(msg.id)}>
                     <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4 items-center">
-                            <span className="font-semibold text-left">{msg.subject}</span>
+                        <div className={cn("flex justify-between w-full pr-4 items-center", !msg.read && "font-bold")}>
+                            <span className="text-left">{msg.subject}</span>
                             <span className="text-sm text-muted-foreground ml-4 shrink-0">{new Date(msg.date).toLocaleDateString()}</span>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent className="text-base text-muted-foreground p-4 bg-muted/50 rounded-md space-y-4">
                         <p>{msg.message}</p>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    {t('deleteMessage')}
+                        <div className="flex gap-2">
+                            {!msg.read && (
+                                <Button variant="outline" size="sm" onClick={() => handleMarkAsRead(msg.id)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Mark as Read
                                 </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>{t('deleteMessageTitle')}</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {t('deleteMessageConfirmation')}
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(msg.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                    {t('delete')}
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                            )}
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        {t('deleteMessage')}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>{t('deleteMessageTitle')}</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        {t('deleteMessageConfirmation')}
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(msg.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                        {t('delete')}
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
                     </AccordionContent>
                 </AccordionItem>
             ))}
