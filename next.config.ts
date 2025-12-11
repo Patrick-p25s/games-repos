@@ -3,16 +3,16 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* Framework et build */
-  reactStrictMode: true,         // active le mode strict pour React
-  swcMinify: true,               // minification SWC pour build plus rapide
-  output: undefined,             // pas d'export statique, car Server Actions
+  reactStrictMode: true,         // Active le mode strict pour React
+  swcMinify: true,               // Active la minification SWC pour des builds plus rapides
+  output: undefined,             // Pas d'export statique, car nous utilisons des Server Actions
 
   /* TypeScript & ESLint */
   typescript: {
-    ignoreBuildErrors: true,     // ignore les erreurs de types à la build
+    ignoreBuildErrors: true,     // Ignore les erreurs de types TypeScript lors de la construction
   },
   eslint: {
-    ignoreDuringBuilds: true,    // ignore linting à la build
+    ignoreDuringBuilds: true,    // Ignore les erreurs ESLint lors de la construction
   },
 
   /* Images distantes autorisées */
@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
     ],
   },
   
+  // Redirections pour les API Genkit
   async rewrites() {
     return [
       {
