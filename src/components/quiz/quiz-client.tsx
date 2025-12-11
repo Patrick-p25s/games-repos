@@ -20,18 +20,19 @@ import { Check, Loader2, Play, Home, X, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useCallback, useReducer } from "react";
 import { useLocale } from "@/contexts/locale-context";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
 
 type QuizStatus = "lobby" | "loading" | "playing" | "finished";
 type Question = GenerateQuizQuestionsOutput["questions"][0];
 
-// Add a label component to be used with RadioGroup
+// ShadCN UI is missing a Label component for the RadioGroup, so we define a simple one here.
 const Label = ({ htmlFor, className, children }: {htmlFor: string; className: string; children: React.ReactNode}) => (
     <label htmlFor={htmlFor} className={className}>{children}</label>
 )
 
+// Using a reducer helps manage complex state transitions more reliably.
 type QuizState = {
   status: QuizStatus;
   questions: Question[];
@@ -43,6 +44,7 @@ type QuizState = {
   statsUpdated: boolean;
 };
 
+// All state is reset here to ensure a clean start for every new game.
 const initialState: QuizState = {
   status: 'lobby',
   questions: [],
@@ -120,9 +122,9 @@ export function QuizClient() {
   const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score, startTime, statsUpdated } = state;
   
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
-
   const { toast } = useToast();
 
+  // This function calls the AI flow to generate quiz questions.
   const loadQuiz = useCallback(async () => {
     dispatch({ type: 'START_LOADING' });
 
@@ -135,6 +137,7 @@ export function QuizClient() {
         numQuestions: 10,
       });
       
+      // Basic validation to ensure the AI returned valid data.
       if (!quizData || !quizData.questions || quizData.questions.length === 0) {
         throw new Error("Generated quiz data is invalid.");
       }
@@ -169,6 +172,7 @@ export function QuizClient() {
     }
   };
   
+  // This effect runs once when the game is finished to update the user's stats.
   useEffect(() => {
     if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
         const playtime = startTime > 0 ? Math.round((Date.now() - startTime) / 60000) : 0;
@@ -189,6 +193,7 @@ export function QuizClient() {
     }
   }, [status, questions, score, startTime, statsUpdated, user, updateUserStats]);
 
+  // Render the lobby screen.
   if (status === "lobby") {
     return (
       <div className="container flex flex-col items-center justify-center min-h-screen py-8">
@@ -225,6 +230,7 @@ export function QuizClient() {
     );
   }
 
+  // Render a loading spinner while waiting for the AI.
   if (status === "loading") {
     return (
       <div className="container py-12 flex justify-center items-center min-h-[calc(100vh-10rem)]">
@@ -236,6 +242,7 @@ export function QuizClient() {
     );
   }
 
+  // Render the results screen when the quiz is finished.
   if (status === "finished") {
     return (
         <div className="container py-12 flex justify-center">
@@ -282,6 +289,7 @@ export function QuizClient() {
     )
   }
 
+  // Render the main quiz playing screen.
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 

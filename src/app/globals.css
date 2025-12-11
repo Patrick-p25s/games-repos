@@ -85,9 +85,11 @@
 }
 
 @layer components {
+  /* Apply a medium shadow to cards in light mode for better depth */
   .card {
     @apply shadow-md;
   }
+  /* In dark mode, a lighter shadow is often better */
   .dark .card {
     @apply shadow-sm;
   }

@@ -2,13 +2,15 @@
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
+// Define the shape of statistics for each game.
 type GameStats = {
   gamesPlayed: number;
   highScore: number;
   totalPlaytime: number; // in minutes
-  [key: string]: number | string; 
+  [key: string]: number | string; // Allows for game-specific stats like 'linesCleared'
 };
 
+// Define the shape for an inbox message.
 export type InboxMessage = {
     id: string;
     subject: string;
@@ -16,6 +18,7 @@ export type InboxMessage = {
     date: string;
 };
 
+// Define the main User data structure.
 export type User = {
   id: string;
   name: string;
@@ -26,21 +29,22 @@ export type User = {
     overall: {
       totalGames: number;
       favoriteGame: string;
-      winRate: number;
-      totalPlaytime: string; // display string e.g., '5h 30m'
+      winRate: number; // Not currently implemented, but here for future use.
+      totalPlaytime: string; // e.g., '5h 30m'
     },
     games: {
       Quiz: GameStats & { avgAccuracy: number, totalCorrect: number, totalQuestions: number };
       Tetris: GameStats & { linesCleared: number };
       Snake: GameStats & { applesEaten: number };
       "Flippy Bird": GameStats & { pipesPassed: number };
-      Memory: GameStats & { bestTime: number }; // best time in seconds
-      Puzzle: GameStats & { bestTime: number }; // best time in seconds
+      Memory: GameStats & { bestTime: number }; // in seconds
+      Puzzle: GameStats & { bestTime: number }; // in seconds
     }
   },
   inbox: InboxMessage[];
 }
 
+// Define the shape for a feedback submission.
 export type Feedback = {
   id: number;
   name: string;
@@ -51,6 +55,7 @@ export type Feedback = {
   userId: string;
 };
 
+// Define the context shape, including state and action functions.
 interface AuthContextType {
   isLoggedIn: boolean;
   user: User | null;
@@ -71,6 +76,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Define the default/initial stats for a new user.
 const defaultStats: User['stats'] = {
   overall: {
     totalGames: 0,
@@ -88,58 +94,53 @@ const defaultStats: User['stats'] = {
   }
 };
 
+// The AuthProvider component wraps the application and provides the auth context.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [viewCount, setViewCount] = useState(0);
 
-
+  // On initial mount, load all data from localStorage.
   useEffect(() => {
-    // This effect runs once on mount to initialize the state from localStorage.
     try {
       const storedAllUsers = localStorage.getItem("nextgen-games-allUsers");
-      if (storedAllUsers) {
-        setAllUsers(JSON.parse(storedAllUsers));
-      }
+      if (storedAllUsers) setAllUsers(JSON.parse(storedAllUsers));
 
       const storedUser = localStorage.getItem("nextgen-games-user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
-        if (!parsedUser.inbox) {
-          parsedUser.inbox = [];
-        }
+        // Ensure inbox exists to prevent errors on older data structures.
+        if (!parsedUser.inbox) parsedUser.inbox = [];
         setUser(parsedUser);
       }
 
       const storedAllFeedback = localStorage.getItem("nextgen-games-allFeedback");
-      if (storedAllFeedback) {
-        setAllFeedback(JSON.parse(storedAllFeedback));
-      }
+      if (storedAllFeedback) setAllFeedback(JSON.parse(storedAllFeedback));
 
       const storedViewCount = localStorage.getItem("nextgen-games-viewCount");
-      setViewCount(storedViewCount ? JSON.parse(storedViewCount) : 0);
+      if (storedViewCount) setViewCount(JSON.parse(storedViewCount));
 
     } catch (error) {
       console.error("Failed to parse data from localStorage", error);
-      // Clear potentially corrupted storage
+      // If storage is corrupted, clear it to start fresh.
       localStorage.clear();
     }
   }, []);
 
+  // Helper function to save all users to state and localStorage.
   const saveAllUsers = (usersToSave: User[]) => {
     localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersToSave));
     setAllUsers(usersToSave);
   }
 
+  // Helper function to save the currently logged-in user.
   const saveUser = (userToSave: User | null) => {
     if (userToSave) {
-        if (!userToSave.inbox) {
-            userToSave.inbox = [];
-        }
+        if (!userToSave.inbox) userToSave.inbox = [];
         localStorage.setItem("nextgen-games-user", JSON.stringify(userToSave));
         
-        let existingUsers = [...allUsers];
+        const existingUsers = [...allUsers];
         const userIndex = existingUsers.findIndex(u => u.id === userToSave.id);
         
         if (userIndex > -1) {
@@ -154,48 +155,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userToSave);
   }
 
+  // Helper function to save feedback to state and localStorage.
   const saveFeedback = (feedbackToSave: Feedback[]) => {
       localStorage.setItem("nextgen-games-allFeedback", JSON.stringify(feedbackToSave));
       setAllFeedback(feedbackToSave);
   }
 
+  // Login function: finds an existing user or creates a new one.
   const login = (email: string, name?: string) => {
     const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
     const userId = email.toLowerCase();
     
-    // We use the state `allUsers` which is guaranteed to be up-to-date.
     let loggedInUser = allUsers.find(u => u.id === userId);
 
     if (!loggedInUser) {
+        // Create a new user if one doesn't exist.
         loggedInUser = {
           id: userId,
           name: name || (isAdminUser ? "Patrick Nomentsoa" : "Player One"),
           email: email,
           avatar: `https://picsum.photos/seed/${email}/96/96`,
           role: isAdminUser ? 'admin' : 'user',
-          stats: JSON.parse(JSON.stringify(defaultStats)), // Deep copy
+          stats: JSON.parse(JSON.stringify(defaultStats)), // Deep copy for safety
           inbox: [],
         };
     } else {
-        if (!loggedInUser.inbox) {
-            loggedInUser.inbox = [];
-        }
-        if (!loggedInUser.stats) {
-            loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
-        }
+        // Ensure older user data structures are updated.
+        if (!loggedInUser.inbox) loggedInUser.inbox = [];
+        if (!loggedInUser.stats) loggedInUser.stats = JSON.parse(JSON.stringify(defaultStats));
         if (!loggedInUser.stats.games.Quiz.totalCorrect) {
           loggedInUser.stats.games.Quiz.totalCorrect = 0;
           loggedInUser.stats.games.Quiz.totalQuestions = 0;
         }
     }
     
-    // This will save the new/updated user and update the `allUsers` state as well
     saveUser(loggedInUser);
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("nextgen-games-user");
+    saveUser(null);
   };
 
   const updateUser = (newDetails: Partial<User>) => {
@@ -210,10 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = { ...user, stats: JSON.parse(JSON.stringify(user.stats)) as User['stats']}; // Deep copy
       const gameStats = updatedUser.stats.games[game];
       
-      // Update specific game stats
       updatedUser.stats.games[game] = { ...gameStats, ...newStats };
 
-      // Update overall stats
+      // Recalculate overall stats
       updatedUser.stats.overall.totalGames = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.gamesPlayed, 0);
       
       const totalMinutes = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + g.totalPlaytime, 0);
@@ -223,12 +220,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       let favoriteGame = "N/A";
       let maxPlaytime = -1;
-      for (const [gameName, stats] of Object.entries(updatedUser.stats.games)) {
+      Object.entries(updatedUser.stats.games).forEach(([gameName, stats]) => {
           if (stats.totalPlaytime > maxPlaytime) {
               maxPlaytime = stats.totalPlaytime;
               favoriteGame = gameName;
           }
-      }
+      });
       updatedUser.stats.overall.favoriteGame = favoriteGame;
 
       saveUser(updatedUser);
@@ -275,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           users[userIndex].inbox = [newInboxMessage, ...users[userIndex].inbox];
           saveAllUsers(users);
 
-          // If the admin is replying to themselves, update the current user state
+          // If the admin is replying to themselves, update the current user state too.
           if (user?.id === userId) {
             setUser(users[userIndex]);
           }
@@ -284,26 +281,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const incrementViewCount = () => {
     try {
-      const currentCount = localStorage.getItem("nextgen-games-viewCount");
-      const newCount = (currentCount ? parseInt(JSON.parse(currentCount)) : 0) + 1;
-      localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
-      setViewCount(newCount);
+      // Use a function to ensure we're updating from the latest state.
+      setViewCount(currentCount => {
+        const newCount = currentCount + 1;
+        localStorage.setItem("nextgen-games-viewCount", JSON.stringify(newCount));
+        return newCount;
+      });
     } catch (error) {
       console.error("Failed to update view count in localStorage", error);
     }
   };
 
-
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
+  const contextValue = {
+    isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, 
+    updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
+    sendReply, viewCount, incrementViewCount
+  };
+
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, sendReply, viewCount, incrementViewCount }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// Custom hook to easily access the auth context.
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
