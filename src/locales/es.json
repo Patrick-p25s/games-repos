@@ -200,7 +200,10 @@
   "timeIsUp": "¡Se acabó el tiempo!",
   "totalViews": "Vistas totales",
   "totalViewsDescription": "Vistas de página totales de la aplicación.",
-  "emailInUse": "Esta dirección de correo electrónico ya está en uso. Por favor, utiliza un correo electrónico diferente o inicia sesión."
+  "emailInUse": "Esta dirección de correo electrónico ya está en uso. Por favor, utiliza un correo electrónico diferente o inicia sesión.",
+  "messageDeleted": "Mensaje eliminado",
+  "messageDeletedSuccess": "El mensaje ha sido eliminado de tu bandeja de entrada.",
+  "deleteMessage": "Eliminar mensaje",
+  "deleteMessageTitle": "¿Eliminar mensaje?",
+  "deleteMessageConfirmation": "¿Estás seguro de que quieres eliminar este mensaje de forma permanente? Esta acción no se puede deshacer."
 }
-
-    

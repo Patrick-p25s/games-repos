@@ -200,7 +200,10 @@
   "timeIsUp": "Tapitra ny fotoana!",
   "totalViews": "Fitambaran'ny fijerena",
   "totalViewsDescription": "Fitambaran'ny fijerena pejy fampiharana.",
-  "emailInUse": "Efa ampiasaina ity adiresy mailaka ity. Mampiasà mailaka hafa na midira."
+  "emailInUse": "Efa ampiasaina ity adiresy mailaka ity. Mampiasà mailaka hafa na midira.",
+  "messageDeleted": "Voafafa ny hafatra",
+  "messageDeletedSuccess": "Voafafa tao amin'ny boaty fandraisanao ilay hafatra.",
+  "deleteMessage": "Fafao ny hafatra",
+  "deleteMessageTitle": "Hamafa hafatra?",
+  "deleteMessageConfirmation": "Tena te hamafa tanteraka ity hafatra ity ve ianao? Tsy azo averina io hetsika io."
 }
-
-    

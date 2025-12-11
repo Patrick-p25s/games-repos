@@ -200,7 +200,10 @@
   "timeIsUp": "Le temps est écoulé !",
   "totalViews": "Vues totales",
   "totalViewsDescription": "Vues de page totales de l'application.",
-  "emailInUse": "Cette adresse e-mail est déjà utilisée. Veuillez utiliser une autre adresse e-mail ou vous connecter."
+  "emailInUse": "Cette adresse e-mail est déjà utilisée. Veuillez utiliser une autre adresse e-mail ou vous connecter.",
+  "messageDeleted": "Message supprimé",
+  "messageDeletedSuccess": "Le message a été retiré de votre boîte de réception.",
+  "deleteMessage": "Supprimer le message",
+  "deleteMessageTitle": "Supprimer le message?",
+  "deleteMessageConfirmation": "Êtes-vous sûr de vouloir supprimer définitivement ce message? Cette action est irréversible."
 }
-
-    

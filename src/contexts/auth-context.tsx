@@ -72,6 +72,7 @@ interface AuthContextType {
   deleteFeedback: (feedbackId: number) => void;
   sendReply: (userId: string, subject: string, message: string) => void;
   incrementViewCount: () => void;
+  deleteMessage: (messageId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -284,32 +285,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveFeedback]);
 
   const sendReply = useCallback((userId: string, subject: string, message: string) => {
-      setAllUsers(currentUsers => {
-          const users = [...currentUsers];
-          const userIndex = users.findIndex(u => u.id === userId);
-          if (userIndex > -1) {
-              const newInboxMessage: InboxMessage = {
-                  id: `msg-${Date.now()}`,
-                  subject: `Re: ${subject}`,
-                  message,
-                  date: new Date().toLocaleDateString('en-CA'),
-              };
-              // Ensure inbox array exists
-              if (!users[userIndex].inbox) {
-                users[userIndex].inbox = [];
-              }
-              users[userIndex].inbox.unshift(newInboxMessage); // Add to the beginning
-              
-              // If the admin is replying to themselves, update the current user state directly
-              if (user?.id === userId) {
-                  setUser(users[userIndex]);
-                  localStorage.setItem("nextgen-games-user", JSON.stringify(users[userIndex]));
-              }
-              localStorage.setItem("nextgen-games-allUsers", JSON.stringify(users));
-          }
-          return users;
-      });
+    setAllUsers(currentUsers => {
+        const usersCopy = [...currentUsers];
+        const userIndex = usersCopy.findIndex(u => u.id === userId);
+
+        if (userIndex > -1) {
+            const newInboxMessage: InboxMessage = {
+                id: `msg-${Date.now()}`,
+                subject: `Re: ${subject}`,
+                message,
+                date: new Date().toLocaleDateString('en-CA'),
+            };
+
+            const targetUser = { ...usersCopy[userIndex] };
+            targetUser.inbox = [newInboxMessage, ...(targetUser.inbox || [])];
+            usersCopy[userIndex] = targetUser;
+
+            if (user?.id === userId) {
+                setUser(targetUser);
+            }
+            localStorage.setItem("nextgen-games-allUsers", JSON.stringify(usersCopy));
+        }
+        return usersCopy;
+    });
   }, [user]);
+
+  const deleteMessage = useCallback((messageId: string) => {
+    setUser(currentUser => {
+        if (!currentUser) return null;
+
+        const updatedInbox = currentUser.inbox.filter(msg => msg.id !== messageId);
+        const updatedUser = { ...currentUser, inbox: updatedInbox };
+        
+        saveUser(updatedUser);
+        return updatedUser;
+    });
+  }, [saveUser]);
 
   const incrementViewCount = useCallback(() => {
     try {
@@ -330,7 +341,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const contextValue = {
     isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, 
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
-    sendReply, viewCount, incrementViewCount
+    sendReply, viewCount, incrementViewCount, deleteMessage
   };
 
   return (
@@ -348,5 +359,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    

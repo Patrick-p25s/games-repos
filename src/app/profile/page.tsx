@@ -1,25 +1,47 @@
 
 "use client";
 
-import { useAuth, type InboxMessage } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context";
 import { UserStats } from "@/components/profile/user-stats";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { LogIn, Mail, MailOpen } from "lucide-react";
+import { LogIn, Mail, MailOpen, Trash2 } from "lucide-react";
 import { useLocale } from "@/contexts/locale-context";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"
+} from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+
 
 function Inbox() {
-  const { user } = useAuth();
+  const { user, deleteMessage } = useAuth();
   const { t } = useLocale();
+  const { toast } = useToast();
+
+  const handleDelete = (messageId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevents the accordion from toggling
+    deleteMessage(messageId);
+    toast({
+        title: t('messageDeleted'),
+        description: t('messageDeletedSuccess'),
+    });
+  }
 
   if (!user || user.inbox.length === 0) {
     return (
@@ -51,13 +73,35 @@ function Inbox() {
             {user.inbox.map((msg) => (
                 <AccordionItem value={msg.id} key={msg.id}>
                     <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4">
-                            <span className="font-semibold">{msg.subject}</span>
-                            <span className="text-sm text-muted-foreground">{msg.date}</span>
+                        <div className="flex justify-between w-full pr-4 items-center">
+                            <span className="font-semibold text-left">{msg.subject}</span>
+                            <span className="text-sm text-muted-foreground ml-4 shrink-0">{msg.date}</span>
                         </div>
                     </AccordionTrigger>
-                    <AccordionContent className="text-base text-muted-foreground p-4 bg-muted/50 rounded-md">
-                        {msg.message}
+                    <AccordionContent className="text-base text-muted-foreground p-4 bg-muted/50 rounded-md space-y-4">
+                        <p>{msg.message}</p>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    {t('deleteMessage')}
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>{t('deleteMessageTitle')}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {t('deleteMessageConfirmation')}
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                                <AlertDialogAction onClick={(e) => handleDelete(msg.id, e)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                    {t('delete')}
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </AccordionContent>
                 </AccordionItem>
             ))}
