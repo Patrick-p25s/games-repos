@@ -166,7 +166,7 @@ export default function ProfilePage() {
       <div className="flex flex-col items-center text-center mb-12">
           <Avatar className="h-24 w-24 mb-4 border-4 border-primary">
             <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>{user.name ? user.name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
           </Avatar>
           <h1 className="text-4xl font-bold tracking-tight font-headline">{user.name}</h1>
           <p className="mt-2 text-lg text-muted-foreground">
