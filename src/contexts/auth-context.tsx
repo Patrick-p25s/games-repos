@@ -131,9 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (docSnap.exists()) {
           setViewCount(docSnap.data().count);
       } else {
-          // This might fail if rules don't allow create for anyone.
-          // Let's assume an admin or a backend function would create this document.
-          // For now, we'll try and let the security rules handle it.
           await setDoc(viewCounterRef, { count: 0 }).catch(error => {
               const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'create', requestResourceData: { count: 0 } });
               errorEmitter.emit('permission-error', contextualError);
@@ -157,13 +154,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await runTransaction(db, async (transaction) => {
             const docSnap = await transaction.get(viewCounterRef);
             if (!docSnap.exists()) {
-                // If the document doesn't exist, create it. This is a fallback.
                 transaction.set(viewCounterRef, { count: 1 });
                 setViewCount(1);
             } else {
                 const newCount = (docSnap.data()?.count || 0) + 1;
                 transaction.update(viewCounterRef, { count: newCount });
-                setViewCount(newCount); // Optimistically update UI
+                setViewCount(newCount);
             }
         });
     } catch (e) {
@@ -183,15 +179,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (userDoc.exists()) {
             let userData = { id: userDoc.id, ...userDoc.data() } as User;
-            // Ensure the admin role is always correct on login
             if (isAdminUser && userData.role !== 'admin') {
                 await updateDoc(userDocRef, { role: 'admin' });
-                userData.role = 'admin'; // Update local object
+                userData.role = 'admin';
             }
             setUser(userData);
             return userData;
         } else {
-            console.log("User document doesn't exist, creating one for:", firebaseUser.uid);
             const name = firebaseUser.displayName || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
@@ -238,7 +232,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.role === 'admin') {
       fetchAdminData();
     } else {
-      // Clear admin data if user is not admin
       setAllUsers([]);
       setAllFeedback([]);
     }
@@ -247,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoaded(false);
       if (firebaseUser) {
         await fetchUserData(firebaseUser);
       } else {
@@ -260,46 +254,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (name: string, email: string, password: string) => {
     if (!auth || !db) throw new Error("Firebase not initialized.");
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
-        const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
-        
-        const newUser: User = {
-          id: firebaseUser.uid,
-          name: name || "New Player", // Ensure name is not empty
-          email,
-          avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
-          role: isAdminUser ? 'admin' : 'user',
-          stats: JSON.parse(JSON.stringify(defaultStats)),
-          inbox: [],
-        };
-        
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(userDocRef, newUser).catch(error => {
-            const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
-            errorEmitter.emit('permission-error', contextualError);
-            throw error;
-        });
-        
-        // After setting doc, set user state directly instead of re-fetching
-        setUser(newUser);
-
-    } catch (error: any) {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
+    const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
+    
+    const newUser: User = {
+      id: firebaseUser.uid,
+      name: name || "New Player",
+      email,
+      avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
+      role: isAdminUser ? 'admin' : 'user',
+      stats: JSON.parse(JSON.stringify(defaultStats)),
+      inbox: [],
+    };
+    
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    await setDoc(userDocRef, newUser).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
+        errorEmitter.emit('permission-error', contextualError);
         throw error;
-    }
+    });
+    
+    setUser(newUser);
   };
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle fetching user data after this.
-        // We can optionally pre-fetch here as well to speed things up, but it might be redundant.
-        await fetchUserData(userCredential.user);
-    } catch (error: any) {
-        throw error;
-    }
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
@@ -365,7 +346,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
             
             transaction.update(userDocRef, { stats: updatedUser.stats });
-            // Optimistically update local state for immediate UI feedback
             setUser(updatedUser);
         });
     } catch (e) {
