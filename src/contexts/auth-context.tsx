@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -287,7 +288,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+        if (error instanceof FirebaseError && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
+            // If user doesn't exist or credential is wrong, try to create an account
+            // This is especially for the admin to easily create their account on first login
+            const username = email.split('@')[0]; // Simple username from email
+            await signup(username, email, password);
+        } else {
+            // Re-throw other errors (e.g., network issues)
+            throw error;
+        }
+    }
   };
 
   const logout = async () => {
