@@ -1,4 +1,3 @@
-
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -283,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
     try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, email, password);
         // onAuthStateChanged will handle fetching user data, so we don't need to do anything here.
         // It's already triggered by signInWithEmailAndPassword.
     } catch (error: any) {
