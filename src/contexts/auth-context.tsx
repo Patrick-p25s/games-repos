@@ -10,7 +10,7 @@ import {
   User as FirebaseUser,
   FirebaseError,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 
@@ -403,32 +403,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendReply = async (userId: string, subject: string, message: string, originalFeedbackId: string) => {
     if (!db || !isAdmin) return;
-    const userDocRef = doc(db, 'users', userId);
-    const feedbackDocRef = doc(db, 'feedback', originalFeedbackId);
+    const userDocRef = doc(db, "users", userId);
+    const feedbackDocRef = doc(db, "feedback", originalFeedbackId);
 
     try {
-        const batch = writeBatch(db);
-        
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) { throw "Document does not exist!"; }
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) {
+                throw "User document does not exist!";
+            }
 
-        const userData = userDoc.data() as User;
-        const newInboxMessage: InboxMessage = { id: `msg-${Date.now()}-${Math.random()}`, subject: `Re: ${subject}`, message, date: new Date().toISOString(), read: false };
-        const newInbox = [newInboxMessage, ...(userData.inbox || [])];
-        
-        batch.update(userDocRef, { inbox: newInbox });
-        batch.delete(feedbackDocRef);
+            const userData = userDoc.data() as User;
+            const newInboxMessage: InboxMessage = {
+                id: `msg-${Date.now()}-${Math.random()}`,
+                subject: `Re: ${subject}`,
+                message,
+                date: new Date().toISOString(),
+                read: false,
+            };
 
-        await batch.commit();
+            // Prepend the new message to the existing inbox array.
+            const newInbox = [newInboxMessage, ...(userData.inbox || [])];
 
+            // Atomically update the user's document and delete the feedback.
+            transaction.update(userDocRef, { inbox: newInbox });
+            transaction.delete(feedbackDocRef);
+        });
+
+        // Update local state after the transaction is successful.
         setAllFeedback(current => current.filter(f => f.id !== originalFeedbackId));
 
-    } catch(e) {
+    } catch (e) {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: '...' } });
         errorEmitter.emit('permission-error', contextualError);
         throw e;
     }
-  };
+};
 
   const deleteMessage = async (messageId: string) => {
     if (!user || !db) return;
