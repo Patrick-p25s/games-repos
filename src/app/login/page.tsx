@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useLocale } from "@/contexts/locale-context"
+import { FirebaseError } from "firebase/app"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -34,7 +35,7 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, signup } = useAuth()
   const { t } = useLocale();
   const router = useRouter()
   const { toast } = useToast()
@@ -56,11 +57,39 @@ export default function LoginPage() {
       })
       router.push("/")
     } catch (error: any) {
-       toast({
-        variant: "destructive",
-        title: t('error'),
-        description: error.message || "An unexpected error occurred.",
-      });
+       if (error instanceof FirebaseError && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
+         try {
+            // If user does not exist, or credential is wrong let's try to create it.
+            // This helps ensure the admin account can be created easily.
+            const username = data.email.split('@')[0];
+            await signup(username, data.email, data.password);
+            toast({
+                title: t('accountCreated'),
+                description: t('signedUpSuccess'),
+            });
+            router.push('/');
+         } catch (signupError: any) {
+            if (signupError instanceof FirebaseError && signupError.code === 'auth/email-already-in-use') {
+                toast({
+                    variant: "destructive",
+                    title: t('invalidPassword'),
+                    description: t('checkPassword'),
+                });
+            } else {
+                 toast({
+                    variant: "destructive",
+                    title: t('error'),
+                    description: signupError.message || "An unexpected error occurred during sign-up.",
+                });
+            }
+         }
+       } else {
+         toast({
+            variant: "destructive",
+            title: t('error'),
+            description: error.message || "An unexpected error occurred during login.",
+          });
+       }
     }
   }
 

@@ -9,29 +9,26 @@ import { useLocale } from "@/contexts/locale-context";
 import { Loader2 } from "lucide-react";
 
 export default function AdminPage() {
-  const { isAdmin, isLoggedIn, user } = useAuth();
+  const { isAdmin, isLoggedIn, isLoaded } = useAuth();
   const { t } = useLocale();
   const router = useRouter();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
+  
   useEffect(() => {
-    // Si l'état de l'utilisateur est en cours de chargement, nous attendons.
-    if (user === undefined) {
-      return;
+    // We wait until the auth state is fully loaded and confirmed.
+    if (!isLoaded) {
+      return; // Do nothing while loading
     }
     
-    // Une fois que l'état de l'utilisateur est connu (null ou un objet utilisateur), nous procédons.
-    setIsCheckingAuth(false);
-    
+    // Once loaded, we can make a decision.
     if (!isLoggedIn) {
-      router.push("/login");
+      router.push("/login"); // If not logged in, go to login.
     } else if (!isAdmin) {
-      router.push("/");
+      router.push("/"); // If logged in but not admin, go to home.
     }
-  }, [isAdmin, isLoggedIn, user, router]);
+  }, [isLoaded, isLoggedIn, isAdmin, router]);
 
-  // Affiche un spinner pendant que l'état d'authentification est vérifié.
-  if (isCheckingAuth) {
+  // While the auth state is being determined, show a loading spinner.
+  if (!isLoaded || !isLoggedIn || !isAdmin) {
     return (
       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -39,12 +36,7 @@ export default function AdminPage() {
     );
   }
   
-  // Si l'utilisateur n'est pas un administrateur connecté, ne rien rendre (la redirection aura déjà été déclenchée).
-  if (!isAdmin || !isLoggedIn) {
-    return null;
-  }
-
-  // Affiche le tableau de bord une fois l'authentification confirmée.
+  // Only render the dashboard if the user is a confirmed admin.
   return (
     <div className="container py-12">
         <div className="text-center mb-12">

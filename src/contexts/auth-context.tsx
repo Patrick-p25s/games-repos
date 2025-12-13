@@ -168,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
         const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'update', requestResourceData: { count: viewCount + 1 } });
         errorEmitter.emit('permission-error', contextualError);
+        throw e;
     }
 }, [db, viewCount]);
 
@@ -182,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (userDoc.exists()) {
             let userData = { id: userDoc.id, ...userDoc.data() } as User;
+            // Ensure admin role is always correct on login
             if (isAdminUser && userData.role !== 'admin') {
                 await updateDoc(userDocRef, { role: 'admin' });
                 userData.role = 'admin';
@@ -189,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
-            // This case is a fallback for users created directly in Firebase console
+            // This case is for new users or fallback.
             const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
@@ -241,16 +243,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, fetchAdminData]);
 
+  // Centralized auth state listener. This is the source of truth.
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+        setIsLoaded(true);
+        return;
+    };
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoaded(false);
       if (firebaseUser) {
         await fetchUserData(firebaseUser);
       } else {
         setUser(null);
       }
-      setIsLoaded(true);
+      setIsLoaded(true); // Mark as loaded only after user state is fully resolved.
     });
     return () => unsubscribe();
   }, [auth, fetchUserData]);
@@ -278,19 +283,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    // onAuthStateChanged will handle setting the user state, no need to call setUser here
+    // onAuthStateChanged will handle setting the user state.
   };
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    // This will trigger onAuthStateChanged which will then call fetchUserData
+    // This triggers onAuthStateChanged, which handles the rest.
     await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
     if (!auth) return;
     await signOut(auth);
-    setUser(null);
+    // onAuthStateChanged will set user to null.
     router.push('/');
   };
 
@@ -463,5 +468,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
