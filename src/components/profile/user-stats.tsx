@@ -25,7 +25,7 @@ export function UserStats() {
     const { user, resetStats } = useAuth();
     const { toast } = useToast();
 
-    if (!user) {
+    if (!user || !user.stats) {
         return null;
     }
 
