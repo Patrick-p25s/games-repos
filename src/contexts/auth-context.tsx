@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -130,6 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (docSnap.exists()) {
           setViewCount(docSnap.data().count);
       } else {
+          // This might fail if rules don't allow create for anyone.
+          // Let's assume an admin or a backend function would create this document.
+          // For now, we'll try and let the security rules handle it.
           await setDoc(viewCounterRef, { count: 0 }).catch(error => {
               const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'create', requestResourceData: { count: 0 } });
               errorEmitter.emit('permission-error', contextualError);
@@ -147,26 +151,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchViewCount]);
 
   const incrementViewCount = useCallback(async () => {
-      if (!db) return;
-      const viewCounterRef = doc(db, 'app-stats', 'viewCounter');
-      try {
-          await runTransaction(db, async (transaction) => {
-              const docSnap = await transaction.get(viewCounterRef);
-              const newCount = (docSnap.data()?.count || 0) + 1;
-              transaction.update(viewCounterRef, { count: newCount });
-              setViewCount(newCount); // Optimistically update UI
-          });
-      } catch (e) {
-          const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'update', requestResourceData: { count: viewCount + 1 } });
-          errorEmitter.emit('permission-error', contextualError);
-      }
-  }, [db, viewCount]);
+    if (!db) return;
+    const viewCounterRef = doc(db, 'app-stats', 'viewCounter');
+    try {
+        await runTransaction(db, async (transaction) => {
+            const docSnap = await transaction.get(viewCounterRef);
+            if (!docSnap.exists()) {
+                // If the document doesn't exist, create it. This is a fallback.
+                transaction.set(viewCounterRef, { count: 1 });
+                setViewCount(1);
+            } else {
+                const newCount = (docSnap.data()?.count || 0) + 1;
+                transaction.update(viewCounterRef, { count: newCount });
+                setViewCount(newCount); // Optimistically update UI
+            }
+        });
+    } catch (e) {
+        const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'update', requestResourceData: { count: viewCount + 1 } });
+        errorEmitter.emit('permission-error', contextualError);
+    }
+}, [db, viewCount]);
+
 
  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     if (!db) return null;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     try {
-        let userDoc = await getDoc(userDocRef);
+        const userDoc = await getDoc(userDocRef);
         const email = firebaseUser.email || "";
         const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
 
@@ -256,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         const newUser: User = {
           id: firebaseUser.uid,
-          name,
+          name: name || "New Player", // Ensure name is not empty
           email,
           avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
           role: isAdminUser ? 'admin' : 'user',
@@ -282,9 +293,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
     try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle fetching user data, so we don't need to do anything here.
-        // It's already triggered by signInWithEmailAndPassword.
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged will handle fetching user data after this.
+        // We can optionally pre-fetch here as well to speed things up, but it might be redundant.
+        await fetchUserData(userCredential.user);
     } catch (error: any) {
         throw error;
     }
