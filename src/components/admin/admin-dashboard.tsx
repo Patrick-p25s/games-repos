@@ -1,4 +1,3 @@
-
 // Ce fichier contient le composant du tableau de bord de l'administrateur.
 "use client";
 
@@ -155,16 +154,14 @@ export function AdminDashboard() {
     return total + user.stats.overall.totalPlaytime;
   }, 0);
   
-  // Formate le temps de jeu total en une chaîne lisible (ex: "5h 30m").
-  const formatTotalPlaytime = (seconds: number): string => {
-    if (seconds === 0) return '0m';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) {
-      return `${h}h ${m}m`;
-    }
-    return `${m}m`;
-  };
+  // Formate les secondes en une chaîne lisible (ex: "HH:MM:SS").
+    const formatTotalPlaytime = (seconds: number): string => {
+        if (isNaN(seconds) || seconds < 0) return '00:00:00';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    };
 
   const totalPlaytimeDisplay = formatTotalPlaytime(totalPlaytimeSeconds);
   
@@ -299,7 +296,7 @@ export function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-center font-medium">{user.stats?.overall?.totalGames ?? 0}</TableCell>
                         <TableCell className="text-center hidden sm:table-cell font-medium">{user.stats?.overall?.winRate ?? 0}%</TableCell>
-                        <TableCell className="text-center hidden sm:table-cell font-medium">{formatTotalPlaytime(user.stats?.overall?.totalPlaytime ?? 0)}</TableCell>
+                        <TableCell className="text-center hidden sm:table-cell font-medium tabular-nums">{formatTotalPlaytime(user.stats?.overall?.totalPlaytime ?? 0)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

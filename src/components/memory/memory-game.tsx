@@ -48,7 +48,7 @@ export function MemoryGame() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameImage = PlaceHolderImages.find(img => img.id === 'memory');
-  const startTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
   const [statsUpdated, setStatsUpdated] = useState(false);
 
 
@@ -68,13 +68,14 @@ export function MemoryGame() {
     setGameState('over');
     setIsWon(won);
     if (timerRef.current) clearInterval(timerRef.current);
-    const finalTime = Math.round((Date.now() - startTimeRef.current) / 1000);
-    const calculatedScore = won ? Math.max(0, 10000 - (moves * 10) - finalTime) : 0;
+    const finalTime = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
+    setTime(finalTime);
+    const calculatedScore = won ? Math.max(0, 5000 - (moves * 10) - (finalTime * 5)) : 0;
     setScore(calculatedScore);
   }, [moves]);
   
   useEffect(() => {
-    if (gameState === 'over' && user && !statsUpdated) {
+    if (gameState === 'over' && user && !statsUpdated && startTimeRef.current) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Memory;
         const newBestTime = isWon && (existingStats.bestTime === 0 || playtimeInSeconds < existingStats.bestTime) ? playtimeInSeconds : existingStats.bestTime;
@@ -106,13 +107,18 @@ export function MemoryGame() {
   }, [generateCards]);
 
   useEffect(() => {
-    if (gameState === 'playing') {
+    if (gameState === 'playing' && !timerRef.current) {
       timerRef.current = setInterval(() => {
-        setTime(prevTime => prevTime + 1);
+        if(startTimeRef.current){
+          setTime(Math.round((Date.now() - startTimeRef.current) / 1000));
+        }
       }, 1000);
 
       return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       };
     }
   }, [gameState]);

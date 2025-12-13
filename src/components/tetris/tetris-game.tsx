@@ -51,7 +51,7 @@ export function TetrisGame() {
   const [linesCleared, setLinesCleared] = useState(0);
   const [time, setTime] = useState(0);
   const gameImage = PlaceHolderImages.find(img => img.id === 'tetris');
-  const startTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
   const [statsUpdated, setStatsUpdated] = useState(false);
 
 
@@ -61,7 +61,7 @@ export function TetrisGame() {
       shape: TETROMINOS['I'].shape,
   });
   const gameLoopRef = useRef<NodeJS.Timeout>();
-  const timerRef = useRef<NodeJS.Timeout>();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sélectionne un tétromino au hasard.
   const randomTetromino = useCallback((): { shape: number[][], color: string } => {
@@ -80,7 +80,7 @@ export function TetrisGame() {
 
   // Met à jour les statistiques du joueur à la fin de la partie.
   useEffect(() => {
-    if (gameState === 'over' && user && !statsUpdated) {
+    if (gameState === 'over' && user && !statsUpdated && startTimeRef.current) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Tetris', {
             highScore: score,
@@ -218,12 +218,17 @@ export function TetrisGame() {
       gameLoopRef.current = setInterval(drop, gameSpeed);
       
       timerRef.current = setInterval(() => {
-        setTime(prev => prev + 1);
+        if (startTimeRef.current) {
+            setTime(Math.round((Date.now() - startTimeRef.current) / 1000));
+        }
       }, 1000);
 
       return () => {
         if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null;
+        };
       };
     }
   }, [gameState, drop, level]);

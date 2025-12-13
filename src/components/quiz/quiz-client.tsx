@@ -113,7 +113,7 @@ export function QuizClient() {
   const { user, updateUserStats } = useAuth();
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const { status, questions, currentQuestionIndex, selectedAnswer, userAnswers, score } = state;
-  const startTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
   const [statsUpdated, setStatsUpdated] = useState(false);
   
   const gameImage = PlaceHolderImages.find(img => img.id === 'quiz');
@@ -154,8 +154,8 @@ export function QuizClient() {
   
   // This effect runs once when the game is finished to update the user's stats.
   useEffect(() => {
-    if (status === 'finished' && user && questions.length > 0 && !statsUpdated) {
-        const playtimeInSeconds = startTimeRef.current > 0 ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
+    if (status === 'finished' && user && questions.length > 0 && !statsUpdated && startTimeRef.current) {
+        const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         const existingStats = user.stats.games.Quiz;
         const newTotalCorrect = (existingStats.totalCorrect || 0) + score;
         const newTotalQuestions = (existingStats.totalQuestions || 0) + questions.length;

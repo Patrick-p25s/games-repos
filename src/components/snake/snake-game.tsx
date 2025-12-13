@@ -38,8 +38,8 @@ export function SnakeGame() {
   
   // Références pour les boucles de jeu et le temps
   const gameLoopRef = useRef<NodeJS.Timeout>();
-  const timerRef = useRef<NodeJS.Timeout>();
-  const startTimeRef = useRef<number>(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
   const [statsUpdated, setStatsUpdated] = useState(false);
 
   const gameImage = PlaceHolderImages.find(img => img.id === 'snake');
@@ -86,7 +86,7 @@ export function SnakeGame() {
 
   // Met à jour les statistiques de l'utilisateur lorsque la partie est terminée
   useEffect(() => {
-    if (gameState === 'over' && user && !statsUpdated) {
+    if (gameState === 'over' && user && !statsUpdated && startTimeRef.current) {
         const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
         updateUserStats('Snake', {
             highScore: score,
@@ -122,7 +122,7 @@ export function SnakeGame() {
 
         // Gère la collision avec la nourriture
         if (head.x === food.x && head.y === food.y) {
-            setScore(s => s + 5); // Chaque pomme vaut 5 points
+            setScore(s => s + 1); // Chaque pomme vaut 1 point
             setApplesEaten(a => a + 1);
             setFood(createFood(newSnake));
             setSpeed(s => Math.max(50, s - 2)); // Augmente la vitesse
@@ -162,12 +162,17 @@ export function SnakeGame() {
       gameLoopRef.current = setInterval(moveSnake, speed);
       
       timerRef.current = setInterval(() => {
-        setTime(prev => prev + 1);
+        if(startTimeRef.current){
+          setTime(Math.round((Date.now() - startTimeRef.current) / 1000));
+        }
       }, 1000);
 
       return () => {
         if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       };
     }
   }, [gameState, moveSnake, speed, endGame]);

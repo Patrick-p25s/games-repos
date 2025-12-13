@@ -1,4 +1,3 @@
-
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -422,15 +421,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 read: false,
             };
 
-            // Prepend the new message to the existing inbox array.
             const newInbox = [newInboxMessage, ...(userData.inbox || [])];
 
-            // Atomically update the user's document and delete the feedback.
             transaction.update(userDocRef, { inbox: newInbox });
             transaction.delete(feedbackDocRef);
         });
 
-        // Update local state after the transaction is successful.
         setAllFeedback(current => current.filter(f => f.id !== originalFeedbackId));
 
     } catch (e) {

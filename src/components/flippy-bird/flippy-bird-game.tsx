@@ -131,7 +131,7 @@ export function FlippyBirdGame() {
   const prevScore = useRef(score);
   const lastPipeTimeRef = useRef(0);
   const gameOverTriggeredRef = useRef(false);
-  const startTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (score > prevScore.current) {
@@ -248,7 +248,7 @@ export function FlippyBirdGame() {
   
   // Met à jour les statistiques de l'utilisateur à la fin de la partie.
   useEffect(() => {
-    if (status === 'over' && user && !statsUpdated) {
+    if (status === 'over' && user && !statsUpdated && startTimeRef.current) {
       const playtimeInSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
       updateUserStats("Flippy Bird", {
           highScore: score,

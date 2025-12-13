@@ -1,4 +1,3 @@
-
 // Ce fichier affiche les statistiques de jeu détaillées pour l'utilisateur sur sa page de profil.
 "use client"
 
@@ -31,15 +30,13 @@ export function UserStats() {
 
     const { stats } = user;
 
-    // Formate les secondes en une chaîne de caractères lisible (ex: "1h 23m" ou "45m").
+    // Formate les secondes en une chaîne de caractères lisible (ex: "HH:MM:SS").
     const formatPlaytime = (seconds: number): string => {
-        if (seconds === 0) return '0m';
+        if (isNaN(seconds) || seconds < 0) return '00:00:00';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        if (h > 0) {
-            return `${h}h ${m}m`;
-        }
-        return `${m}m`;
+        const s = Math.floor(seconds % 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
     // Récupère une statistique de jeu en toute sécurité, en retournant une valeur par défaut si elle n'existe pas.
@@ -133,7 +130,7 @@ export function UserStats() {
                     </div>
                      <div className="p-4 bg-muted/50 rounded-lg">
                         <Clock className="h-8 w-8 mx-auto text-primary mb-2" />
-                        <p className="text-2xl font-bold">{totalPlaytimeFormatted}</p>
+                        <p className="text-2xl font-bold tabular-nums">{totalPlaytimeFormatted}</p>
                         <p className="text-sm text-muted-foreground">{t('totalPlaytime')}</p>
                     </div>
                 </CardContent>
@@ -155,7 +152,7 @@ export function UserStats() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {game.stats.map((stat, statIndex) => (
                                     <div key={statIndex} className="p-4 bg-muted/50 rounded-lg text-center">
-                                        <p className="text-xl font-bold">{stat.value}</p>
+                                        <p className="text-xl font-bold tabular-nums">{stat.value}</p>
                                         <p className="text-sm text-muted-foreground">{t(stat.title)}</p>
                                     </div>
                                 ))}
