@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Trash2, Reply, Users2, MessageSquare, Clock, Gamepad2, Send, Eye } from "lucide-react";
+import { Trash2, Reply, Users2, MessageSquare, Clock, Gamepad2, Send, Eye, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -71,6 +71,7 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     const { sendReply } = useAuth();
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     const form = useForm<z.infer<typeof replySchema>>({
         resolver: zodResolver(replySchema),
@@ -81,6 +82,8 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
 
     // Gère la soumission du formulaire de réponse.
     async function onSubmit(values: z.infer<typeof replySchema>) {
+        if (isSending) return;
+        setIsSending(true);
         try {
             await sendReply(feedbackItem.userId, feedbackItem.subject, values.message, feedbackItem.id);
             toast({
@@ -95,6 +98,8 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
               title: t('error'),
               description: "Failed to send reply. Please try again.",
             });
+        } finally {
+            setIsSending(false);
         }
     }
 
@@ -128,10 +133,14 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
                         />
                         <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="secondary">{t('cancel')}</Button>
+                                <Button type="button" variant="secondary" disabled={isSending}>{t('cancel')}</Button>
                             </DialogClose>
-                            <Button type="submit">
-                                <Send className="mr-2 h-4 w-4" />
+                            <Button type="submit" disabled={isSending}>
+                                {isSending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="mr-2 h-4 w-4" />
+                                )}
                                 {t('sendReply')}
                             </Button>
                         </DialogFooter>
