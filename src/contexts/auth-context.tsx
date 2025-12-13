@@ -10,7 +10,7 @@ import {
   User as FirebaseUser,
   FirebaseError,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 
@@ -86,7 +86,7 @@ interface AuthContextType {
   resetStats: () => Promise<void>;
   submitFeedback: (feedback: Omit<Feedback, 'id' | 'date' | 'userId'>) => Promise<void>;
   deleteFeedback: (feedbackId: string) => Promise<void>;
-  sendReply: (userId: string, subject: string, message: string) => Promise<void>;
+  sendReply: (userId: string, subject: string, message: string, originalFeedbackId: string) => Promise<void>;
   incrementViewCount: () => void;
   deleteMessage: (messageId: string) => Promise<void>;
   markMessageAsRead: (messageId: string) => Promise<void>;
@@ -288,19 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-        if (error instanceof FirebaseError && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
-            // If user doesn't exist or credential is wrong, try to create an account
-            // This is especially for the admin to easily create their account on first login
-            const username = email.split('@')[0]; // Simple username from email
-            await signup(username, email, password);
-        } else {
-            // Re-throw other errors (e.g., network issues)
-            throw error;
-        }
-    }
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
@@ -396,11 +384,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    await fetchAdminData();
+    // This will be automatically re-fetched by the admin's useEffect
+    if (isAdmin) {
+        await fetchAdminData();
+    }
   };
 
   const deleteFeedback = async (feedbackId: string) => {
-    if (!db) return;
+    if (!db || !isAdmin) return;
     const feedbackDocRef = doc(db, 'feedback', feedbackId);
     await deleteDoc(feedbackDocRef).catch(error => {
         const contextualError = new FirestorePermissionError({ path: feedbackDocRef.path, operation: 'delete' });
@@ -410,18 +401,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAllFeedback(current => current.filter(f => f.id !== feedbackId));
   };
 
-  const sendReply = async (userId: string, subject: string, message: string) => {
-    if (!db) return;
+  const sendReply = async (userId: string, subject: string, message: string, originalFeedbackId: string) => {
+    if (!db || !isAdmin) return;
     const userDocRef = doc(db, 'users', userId);
+    const feedbackDocRef = doc(db, 'feedback', originalFeedbackId);
+
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) { throw "Document does not exist!"; }
-            const userData = userDoc.data() as User;
-            const newInboxMessage: InboxMessage = { id: `msg-${Date.now()}-${Math.random()}`, subject: `Re: ${subject}`, message, date: new Date().toISOString(), read: false };
-            const newInbox = [newInboxMessage, ...(userData.inbox || [])];
-            transaction.update(userDocRef, { inbox: newInbox });
-        });
+        const batch = writeBatch(db);
+        
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists()) { throw "Document does not exist!"; }
+
+        const userData = userDoc.data() as User;
+        const newInboxMessage: InboxMessage = { id: `msg-${Date.now()}-${Math.random()}`, subject: `Re: ${subject}`, message, date: new Date().toISOString(), read: false };
+        const newInbox = [newInboxMessage, ...(userData.inbox || [])];
+        
+        batch.update(userDocRef, { inbox: newInbox });
+        batch.delete(feedbackDocRef);
+
+        await batch.commit();
+
+        setAllFeedback(current => current.filter(f => f.id !== originalFeedbackId));
+
     } catch(e) {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: '...' } });
         errorEmitter.emit('permission-error', contextualError);

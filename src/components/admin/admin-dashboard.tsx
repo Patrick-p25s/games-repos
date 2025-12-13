@@ -69,7 +69,7 @@ const replySchema = z.object({
 // Composant pour la boîte de dialogue de réponse à un feedback.
 function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     const { t } = useLocale();
-    const { sendReply, deleteFeedback } = useAuth();
+    const { sendReply } = useAuth();
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
 
@@ -83,9 +83,7 @@ function ReplyDialog({ feedbackItem }: { feedbackItem: Feedback }) {
     // Gère la soumission du formulaire de réponse.
     async function onSubmit(values: z.infer<typeof replySchema>) {
         try {
-            await sendReply(feedbackItem.userId, feedbackItem.subject, values.message);
-            // Après avoir répondu, nous supprimons l'élément de feedback de la file d'attente de l'admin.
-            await deleteFeedback(feedbackItem.id);
+            await sendReply(feedbackItem.userId, feedbackItem.subject, values.message, feedbackItem.id);
             toast({
               title: t('replySent'),
               description: t('replySentMessage', { name: feedbackItem.name }),

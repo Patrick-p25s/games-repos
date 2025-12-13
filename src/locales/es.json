@@ -185,7 +185,7 @@
   "noLeaderboardData": "Sin datos de clasificación",
   "noLeaderboardDataSubtitle": "¡Juega algunos juegos para ver las clasificaciones con las mejores puntuaciones!",
   "loginToSendFeedback": "Inicia sesión para enviar comentarios",
-  "loginToSendFeedbackMessage": "Debes iniciar sesión para enviar comentarios.",
+  "loginToSendFeedbackMessage": "Debes iniciar sesión para enviar comentarios. Por favor",
   "noFeedbackYet": "Aún no se han enviado comentarios.",
   "replyTo": "Responder a {name}",
   "originalMessage": "Asunto original",

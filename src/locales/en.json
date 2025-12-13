@@ -185,7 +185,7 @@
   "noLeaderboardData": "No Leaderboard Data",
   "noLeaderboardDataSubtitle": "Play some games to see the leaderboards populate with top scores!",
   "loginToSendFeedback": "Login to Send Feedback",
-  "loginToSendFeedbackMessage": "You must be logged in to send feedback.",
+  "loginToSendFeedbackMessage": "You must be logged in to send feedback. Please",
   "noFeedbackYet": "No feedback has been submitted yet.",
   "replyTo": "Reply to {name}",
   "originalMessage": "Original subject",

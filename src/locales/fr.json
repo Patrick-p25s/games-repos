@@ -185,7 +185,7 @@
   "noLeaderboardData": "Aucune donnée de classement",
   "noLeaderboardDataSubtitle": "Jouez à des jeux pour voir les classements se remplir avec les meilleurs scores!",
   "loginToSendFeedback": "Connectez-vous pour envoyer des commentaires",
-  "loginToSendFeedbackMessage": "Vous devez être connecté pour envoyer des commentaires.",
+  "loginToSendFeedbackMessage": "Vous devez être connecté pour envoyer des commentaires. Veuillez vous",
   "noFeedbackYet": "Aucun commentaire n'a encore été soumis.",
   "replyTo": "Répondre à {name}",
   "originalMessage": "Sujet original",

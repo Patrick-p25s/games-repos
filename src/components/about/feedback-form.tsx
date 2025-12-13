@@ -20,6 +20,7 @@ import { Send } from "lucide-react"
 import { useLocale } from "@/contexts/locale-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect } from "react"
+import Link from "next/link"
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -48,6 +49,13 @@ export function FeedbackForm() {
         form.reset({
             name: user.name,
             email: user.email,
+            subject: "",
+            message: "",
+        })
+    } else {
+        form.reset({
+            name: "",
+            email: "",
             subject: "",
             message: "",
         })
@@ -138,9 +146,16 @@ export function FeedbackForm() {
         />
         <Button type="submit" disabled={!isLoggedIn}>
           <Send className="mr-2 h-4 w-4" />
-          {isLoggedIn ? t('sendMessage') : t('loginToSendFeedback')}
+          {t('sendMessage')}
         </Button>
-        {!isLoggedIn && <p className="text-sm text-muted-foreground">{t('loginToSendFeedbackMessage')}</p>}
+        {!isLoggedIn && (
+            <p className="text-sm text-muted-foreground">
+                {t('loginToSendFeedbackMessage')}{' '}
+                <Link href="/login" className="underline hover:text-primary">
+                    {t('login')}
+                </Link>.
+            </p>
+        )}
       </form>
     </Form>
   )
