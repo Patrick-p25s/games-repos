@@ -280,7 +280,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            // If login fails because user doesn't exist or wrong password, try to sign them up.
+            // This is a simplified "sign-in or sign-up" flow.
+            try {
+                const name = email.split('@')[0];
+                await signup(name, email, password);
+            } catch (signupError) {
+                // If signup also fails (e.g., weak password), throw the original login error
+                // to avoid confusing the user.
+                throw error;
+            }
+        } else {
+            // For other errors (e.g., network issues), re-throw them.
+            throw error;
+        }
+    }
   };
 
   const logout = async () => {
@@ -458,3 +476,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    
