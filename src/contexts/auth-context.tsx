@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -75,6 +76,7 @@ interface AuthContextType {
   allFeedback: Feedback[];
   isAdmin: boolean;
   viewCount: number;
+  isLoaded: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -274,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    // setUser(newUser); // Let onAuthStateChanged handle setting the user state
+    // Let onAuthStateChanged handle setting the user state
   };
   
   const login = async (email: string, password: string) => {
@@ -282,7 +284,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-        // If user not found, try to sign them up instead.
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             try {
                 const name = email.split('@')[0];
@@ -458,12 +459,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoggedIn, user, allUsers, isAdmin, login, logout, updateUser, 
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
     sendReply, viewCount, incrementViewCount, deleteMessage, markMessageAsRead,
-    signup
+    signup,
+    isLoaded
   };
   
   return (
     <AuthContext.Provider value={contextValue}>
-      {isLoaded ? children : null}
+      {children}
     </AuthContext.Provider>
   );
 }
