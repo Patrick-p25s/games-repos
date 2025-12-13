@@ -131,7 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (docSnap.exists()) {
           setViewCount(docSnap.data().count);
       } else {
-          // Initialize if it doesn't exist
           await setDoc(viewCounterRef, { count: 0 }).catch(error => {
               const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'create', requestResourceData: { count: 0 } });
               errorEmitter.emit('permission-error', contextualError);
@@ -172,6 +171,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
             setUser({ id: userDoc.id, ...userDoc.data() } as User);
+        } else {
+            // This case can happen if signup is interrupted. Create the doc.
+            const name = firebaseUser.displayName || "New Player";
+            const email = firebaseUser.email || "no-email@example.com";
+            const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
+            const newUser: User = {
+                id: firebaseUser.uid,
+                name,
+                email,
+                avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
+                role: isAdminUser ? 'admin' : 'user',
+                stats: JSON.parse(JSON.stringify(defaultStats)),
+                inbox: [],
+            };
+            await setDoc(userDocRef, newUser).catch(error => {
+                const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
+                errorEmitter.emit('permission-error', contextualError);
+            });
+            setUser(newUser);
         }
     } catch (e) {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
@@ -215,15 +233,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (name: string, email: string, password: string) => {
     if (!auth || !db) throw new Error("Firebase not initialized.");
-    const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
+        const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
         
         const newUser: User = {
           id: firebaseUser.uid,
           name,
-          email: email,
+          email,
           avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
           role: isAdminUser ? 'admin' : 'user',
           stats: JSON.parse(JSON.stringify(defaultStats)),
@@ -231,14 +249,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         
         const userDocRef = doc(db, 'users', firebaseUser.uid);
+        // Explicitly set the document in Firestore.
+        // The onAuthStateChanged listener will then pick this up to set the app state.
         await setDoc(userDocRef, newUser).catch(error => {
             const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
             errorEmitter.emit('permission-error', contextualError);
-            throw error; // Re-throw to be caught by the outer try-catch
+            throw error;
         });
-        setUser(newUser);
+
     } catch (error: any) {
-        // Let the caller handle UI feedback (e.g., toast)
         throw error;
     }
   };
@@ -247,7 +266,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) throw new Error("Firebase not initialized.");
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle setting the user state and fetching data
     } catch (error: any) {
         throw error;
     }
@@ -330,12 +348,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetStats = async () => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
-    await updateDoc(userDocRef, { stats: defaultStats }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: defaultStats } });
+    const newStats = JSON.parse(JSON.stringify(defaultStats));
+    await updateDoc(userDocRef, { stats: newStats }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: newStats } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    setUser(currentUser => currentUser ? { ...currentUser, stats: defaultStats } : null);
+    setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
   };
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
