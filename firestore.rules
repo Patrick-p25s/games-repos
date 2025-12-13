@@ -13,14 +13,17 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Check for the existence of the role field and if it's 'admin'
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isCreatingOwnDocument(userId) {
+      // Ensure the user ID in the document matches the authenticated user's ID
       return isOwner(userId) && request.resource.data.id == userId;
     }
     
     function isUpdatingOwnDocument(userId) {
+        // Ensure the ID in the new data matches the ID of the existing document
         return isOwner(userId) && request.resource.data.id == resource.data.id;
     }
 
@@ -28,7 +31,7 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isCreatingOwnDocument(userId);
-      allow update: if isUpdatingOwnDocument(userId);
+      allow update: if isUpdatingOwnDocument(userId) || isAdmin();
       allow delete: if isOwner(userId);
 
       match /scores/{scoreId} {
