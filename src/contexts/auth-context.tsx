@@ -164,15 +164,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [db, viewCount]);
 
 
-  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
+ const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     if (!db) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     try {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
-            setUser({ id: userDoc.id, ...userDoc.data() } as User);
+            const userData = { id: userDoc.id, ...userDoc.data() } as User;
+            setUser(userData);
+            return userData;
         } else {
-            // This case can happen if signup is interrupted. Create the doc.
+            console.log("User document doesn't exist, creating one for:", firebaseUser.uid);
             const name = firebaseUser.displayName || "New Player";
             const email = firebaseUser.email || "no-email@example.com";
             const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
@@ -190,12 +192,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 errorEmitter.emit('permission-error', contextualError);
             });
             setUser(newUser);
+            return newUser;
         }
     } catch (e) {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
         errorEmitter.emit('permission-error', contextualError);
+        return null;
+    }
+}, [db]);
+
+
+  const fetchAdminData = useCallback(async () => {
+    if (db) {
+        try {
+            const usersCollection = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersCollection);
+            setAllUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+
+            const feedbackCollection = collection(db, 'feedback');
+            const feedbackSnapshot = await getDocs(feedbackCollection);
+            setAllFeedback(feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback)));
+        } catch(e) {
+             const contextualError = new FirestorePermissionError({ path: 'users or feedback', operation: 'list' });
+            errorEmitter.emit('permission-error', contextualError);
+        }
     }
   }, [db]);
+  
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchAdminData();
+    }
+  }, [user, fetchAdminData]);
 
   useEffect(() => {
     if (!auth) return;
@@ -210,26 +238,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [auth, fetchUserData]);
 
-  const fetchAdminData = useCallback(async () => {
-    if (user?.role === 'admin' && db) {
-        try {
-            const usersCollection = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersCollection);
-            setAllUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-
-            const feedbackCollection = collection(db, 'feedback');
-            const feedbackSnapshot = await getDocs(feedbackCollection);
-            setAllFeedback(feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback)));
-        } catch(e) {
-             const contextualError = new FirestorePermissionError({ path: 'users or feedback', operation: 'list' });
-            errorEmitter.emit('permission-error', contextualError);
-        }
-    }
-  }, [user?.role, db]);
-
-  useEffect(() => {
-    fetchAdminData();
-  }, [fetchAdminData]);
 
   const signup = async (name: string, email: string, password: string) => {
     if (!auth || !db) throw new Error("Firebase not initialized.");
@@ -238,8 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const firebaseUser = userCredential.user;
         const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
         
-        const newUser: User = {
-          id: firebaseUser.uid,
+        const newUser: Omit<User, 'id'> = {
           name,
           email,
           avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
@@ -249,13 +256,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        // Explicitly set the document in Firestore.
-        // The onAuthStateChanged listener will then pick this up to set the app state.
         await setDoc(userDocRef, newUser).catch(error => {
             const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
             errorEmitter.emit('permission-error', contextualError);
             throw error;
         });
+        
+        // After setting doc, fetch data to ensure state is synced
+        await fetchUserData(firebaseUser);
+
 
     } catch (error: any) {
         throw error;
@@ -266,6 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) throw new Error("Firebase not initialized.");
     try {
         await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged will handle fetching user data
     } catch (error: any) {
         throw error;
     }
