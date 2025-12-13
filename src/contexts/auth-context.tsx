@@ -186,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
-            const name = firebaseUser.displayName || "New Player";
+            const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
                 name,
@@ -284,18 +284,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            // If login fails because user doesn't exist or wrong password, try to sign them up.
-            // This is a simplified "sign-in or sign-up" flow.
             try {
                 const name = email.split('@')[0];
                 await signup(name, email, password);
-            } catch (signupError) {
-                // If signup also fails (e.g., weak password), throw the original login error
-                // to avoid confusing the user.
-                throw error;
+            } catch (signupError: any) {
+                if (signupError.code !== 'auth/email-already-in-use') {
+                    throw signupError;
+                }
             }
         } else {
-            // For other errors (e.g., network issues), re-throw them.
             throw error;
         }
     }
@@ -476,5 +473,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    

@@ -240,7 +240,7 @@ export function AdminDashboard() {
                     <Gamepad2 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{t(mostPopularGame.toLowerCase().replace(' ', '') || 'quiz')}</div>
+                    <div className="text-2xl font-bold">{mostPopularGame !== 'N/A' ? t(mostPopularGame.toLowerCase().replace(' ', '')) : 'N/A'}</div>
                     <p className="text-xs text-muted-foreground">{t('mostPopularGameDescription')}</p>
                 </CardContent>
             </Card>

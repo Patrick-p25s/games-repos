@@ -9,25 +9,28 @@ import { useLocale } from "@/contexts/locale-context";
 import { Loader2 } from "lucide-react";
 
 export default function AdminPage() {
-  const { isAdmin, isLoggedIn } = useAuth();
+  const { isAdmin, isLoggedIn, user } = useAuth();
   const { t } = useLocale();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // A little delay to ensure the auth state is settled
-    const timer = setTimeout(() => {
-      if (!isLoggedIn) {
-        router.push("/login");
-      } else if (isLoggedIn && !isAdmin) {
-        router.push("/");
-      }
-      setIsCheckingAuth(false);
-    }, 500); // 500ms delay
+    // Si l'état de l'utilisateur est en cours de chargement, nous attendons.
+    if (user === undefined) {
+      return;
+    }
+    
+    // Une fois que l'état de l'utilisateur est connu (null ou un objet utilisateur), nous procédons.
+    setIsCheckingAuth(false);
+    
+    if (!isLoggedIn) {
+      router.push("/login");
+    } else if (!isAdmin) {
+      router.push("/");
+    }
+  }, [isAdmin, isLoggedIn, user, router]);
 
-    return () => clearTimeout(timer);
-  }, [isAdmin, isLoggedIn, router]);
-
+  // Affiche un spinner pendant que l'état d'authentification est vérifié.
   if (isCheckingAuth) {
     return (
       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -36,11 +39,12 @@ export default function AdminPage() {
     );
   }
   
+  // Si l'utilisateur n'est pas un administrateur connecté, ne rien rendre (la redirection aura déjà été déclenchée).
   if (!isAdmin || !isLoggedIn) {
-    // This part should ideally not be reached due to the redirect, but it's a good fallback.
     return null;
   }
 
+  // Affiche le tableau de bord une fois l'authentification confirmée.
   return (
     <div className="container py-12">
         <div className="text-center mb-12">
