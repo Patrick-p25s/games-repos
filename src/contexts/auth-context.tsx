@@ -1,4 +1,3 @@
-
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -9,7 +8,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 
@@ -186,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
+            // This case should be handled by signup, but as a fallback:
             const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
@@ -274,8 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    
-    setUser(newUser);
+    // setUser(newUser); // Let onAuthStateChanged handle setting the user state
   };
   
   const login = async (email: string, password: string) => {
@@ -283,14 +282,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        // If user not found, try to sign them up instead.
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             try {
                 const name = email.split('@')[0];
                 await signup(name, email, password);
+                // After signup, signIn will be handled by onAuthStateChanged
             } catch (signupError: any) {
-                if (signupError.code !== 'auth/email-already-in-use') {
-                    throw signupError;
+                // If signup fails because email is in use, it means wrong password.
+                if (signupError.code === 'auth/email-already-in-use') {
+                    throw new Error("Invalid password.");
                 }
+                throw signupError;
             }
         } else {
             throw error;
