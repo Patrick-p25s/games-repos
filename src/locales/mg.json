@@ -205,5 +205,6 @@
   "messageDeletedSuccess": "Voafafa tao amin'ny boaty fandraisanao ilay hafatra.",
   "deleteMessage": "Fafao ny hafatra",
   "deleteMessageTitle": "Hamafa hafatra?",
-  "deleteMessageConfirmation": "Tena te hamafa tanteraka ity hafatra ity ve ianao? Tsy azo averina io hetsika io."
+  "deleteMessageConfirmation": "Tena te hamafa tanteraka ity hafatra ity ve ianao? Tsy azo averina io hetsika io.",
+  "topPlayers": "Mpilalao tsara indrindra"
 }

@@ -234,9 +234,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [db]);
   
   useEffect(() => {
-    if (user && user.role === 'admin') {
+    if (user?.role === 'admin') {
       fetchAdminData();
     } else {
+      // Clear admin-specific data if the user is not an admin
       setAllUsers([]);
       setAllFeedback([]);
     }
@@ -414,7 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             const userData = userDoc.data() as User;
             const newInboxMessage: InboxMessage = {
-                id: `msg-${Date.now()}-${Math.random()}`,
+                id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 subject: `Re: ${subject}`,
                 message,
                 date: new Date().toISOString(),

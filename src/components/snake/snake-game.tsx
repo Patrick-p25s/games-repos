@@ -1,4 +1,3 @@
-
 // Ce fichier contient le composant principal pour le jeu du serpent (Snake).
 'use client';
 
@@ -122,7 +121,7 @@ export function SnakeGame() {
 
         // Gère la collision avec la nourriture
         if (head.x === food.x && head.y === food.y) {
-            setScore(s => s + 1); // Chaque pomme vaut 1 point
+            setScore(s => s + 10); // Chaque pomme vaut 10 points
             setApplesEaten(a => a + 1);
             setFood(createFood(newSnake));
             setSpeed(s => Math.max(50, s - 2)); // Augmente la vitesse

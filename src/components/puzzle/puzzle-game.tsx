@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -105,7 +104,7 @@ export function PuzzleGame() {
     if (timerRef.current) clearInterval(timerRef.current);
     const finalTime = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
     setTime(finalTime);
-    const calculatedScore = won ? Math.max(0, 5000 - (moves * 10) - (finalTime * 5)) : 0;
+    const calculatedScore = won ? Math.max(0, 10000 - (moves * 20) - (finalTime * 10)) : 0;
     setScore(calculatedScore);
   }, [moves]);
 
@@ -232,7 +231,7 @@ export function PuzzleGame() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-md text-gray-600 dark:text-gray-400">{t('timeTaken')}: <span className="font-bold">{time}s</span></p>
-                    {isWon && <p className="text-lg font-semibold">{t('score')}: {score}</p>}
+                    {isWon && <p className="text-lg font-semibold">{t('score')}: {score.toLocaleString()}</p>}
                 </CardContent>
                 <CardContent className="flex flex-col gap-4">
                     <Button onClick={startGame} size="lg">

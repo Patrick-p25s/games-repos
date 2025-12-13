@@ -205,5 +205,6 @@
   "messageDeletedSuccess": "Le message a été retiré de votre boîte de réception.",
   "deleteMessage": "Supprimer le message",
   "deleteMessageTitle": "Supprimer le message?",
-  "deleteMessageConfirmation": "Êtes-vous sûr de vouloir supprimer définitivement ce message? Cette action est irréversible."
+  "deleteMessageConfirmation": "Êtes-vous sûr de vouloir supprimer définitivement ce message? Cette action est irréversible.",
+  "topPlayers": "Meilleurs joueurs"
 }

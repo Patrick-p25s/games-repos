@@ -205,5 +205,6 @@
   "messageDeletedSuccess": "El mensaje ha sido eliminado de tu bandeja de entrada.",
   "deleteMessage": "Eliminar mensaje",
   "deleteMessageTitle": "¿Eliminar mensaje?",
-  "deleteMessageConfirmation": "¿Estás seguro de que quieres eliminar este mensaje de forma permanente? Esta acción no se puede deshacer."
+  "deleteMessageConfirmation": "¿Estás seguro de que quieres eliminar este mensaje de forma permanente? Esta acción no se puede deshacer.",
+  "topPlayers": "Mejores jugadores"
 }

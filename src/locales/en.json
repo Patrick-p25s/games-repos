@@ -205,5 +205,6 @@
   "messageDeletedSuccess": "The message has been removed from your inbox.",
   "deleteMessage": "Delete Message",
   "deleteMessageTitle": "Delete Message?",
-  "deleteMessageConfirmation": "Are you sure you want to permanently delete this message? This action cannot be undone."
+  "deleteMessageConfirmation": "Are you sure you want to permanently delete this message? This action cannot be undone.",
+  "topPlayers": "Top Players"
 }
