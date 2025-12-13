@@ -288,7 +288,7 @@ export function AdminDashboard() {
                           <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10">
                               <AvatarImage src={user.avatar} alt={user.name} />
-                              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                              <AvatarFallback>{user.name ? user.name.charAt(0) : 'U'}</AvatarFallback>
                             </Avatar>
                             <div>
                                 <p className="font-medium">{user.name}</p>
@@ -299,9 +299,9 @@ export function AdminDashboard() {
                         <TableCell className="hidden md:table-cell">
                             <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'} className="capitalize">{t(user.role)}</Badge>
                         </TableCell>
-                        <TableCell className="text-center font-medium">{user.stats.overall.totalGames}</TableCell>
-                        <TableCell className="text-center hidden sm:table-cell font-medium">{user.stats.overall.winRate}%</TableCell>
-                        <TableCell className="text-center hidden sm:table-cell font-medium">{formatTotalPlaytime(user.stats.overall.totalPlaytime)}</TableCell>
+                        <TableCell className="text-center font-medium">{user.stats?.overall?.totalGames ?? 0}</TableCell>
+                        <TableCell className="text-center hidden sm:table-cell font-medium">{user.stats?.overall?.winRate ?? 0}%</TableCell>
+                        <TableCell className="text-center hidden sm:table-cell font-medium">{formatTotalPlaytime(user.stats?.overall?.totalPlaytime ?? 0)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
