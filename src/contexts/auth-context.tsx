@@ -1,4 +1,3 @@
-
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';

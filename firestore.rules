@@ -13,18 +13,18 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check for the existence of the role field and if it's 'admin'
+      // Check for the existence of the role field in the user's document and if it's 'admin'
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isCreatingOwnDocument(userId) {
-      // Ensure the user ID in the document matches the authenticated user's ID
+      // Ensure the user ID in the document being created matches the authenticated user's ID
       return isOwner(userId) && request.resource.data.id == userId;
     }
     
     function isUpdatingOwnDocument(userId) {
-        // Ensure the ID in the new data matches the ID of the existing document
-        return isOwner(userId) && request.resource.data.id == resource.data.id;
+        // Ensure the user is the owner. Specific field validation should be done in rules below.
+        return isOwner(userId);
     }
 
     match /users/{userId} {
@@ -32,29 +32,25 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isCreatingOwnDocument(userId);
       allow update: if isUpdatingOwnDocument(userId) || isAdmin();
-      allow delete: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
 
       match /scores/{scoreId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isCreatingOwnDocument(userId);
-        allow update, delete: if isUpdatingOwnDocument(userId);
+        allow read, list, write: if isOwner(userId) || isAdmin();
       }
 
       match /quiz_history/{userQuizHistoryId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isCreatingOwnDocument(userId);
-        allow update, delete: if isUpdatingOwnDocument(userId);
+        allow read, list, write: if isOwner(userId) || isAdmin();
       }
     }
 
     match /games/{gameId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     match /quiz_questions/{quizQuestionId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
     }
     
     match /feedback/{feedbackId} {
