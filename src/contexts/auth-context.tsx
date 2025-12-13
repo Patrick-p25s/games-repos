@@ -163,21 +163,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
   }, [db, viewCount]);
 
-
  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
-    if (!db) return;
+    if (!db) return null;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     try {
-        const userDoc = await getDoc(userDocRef);
+        let userDoc = await getDoc(userDocRef);
+        const email = firebaseUser.email || "";
+        const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
+
         if (userDoc.exists()) {
-            const userData = { id: userDoc.id, ...userDoc.data() } as User;
+            let userData = { id: userDoc.id, ...userDoc.data() } as User;
+            // Ensure the admin role is always correct on login
+            if (isAdminUser && userData.role !== 'admin') {
+                await updateDoc(userDocRef, { role: 'admin' });
+                userData.role = 'admin'; // Update local object
+            }
             setUser(userData);
             return userData;
         } else {
             console.log("User document doesn't exist, creating one for:", firebaseUser.uid);
             const name = firebaseUser.displayName || "New Player";
-            const email = firebaseUser.email || "no-email@example.com";
-            const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
             const newUser: User = {
                 id: firebaseUser.uid,
                 name,
@@ -222,6 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchAdminData();
+    } else {
+      // Clear admin data if user is not admin
+      setAllUsers([]);
+      setAllFeedback([]);
     }
   }, [user, fetchAdminData]);
 
@@ -246,7 +255,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const firebaseUser = userCredential.user;
         const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
         
-        const newUser: Omit<User, 'id'> = {
+        const newUser: User = {
+          id: firebaseUser.uid,
           name,
           email,
           avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
@@ -262,9 +272,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw error;
         });
         
-        // After setting doc, fetch data to ensure state is synced
-        await fetchUserData(firebaseUser);
-
+        // After setting doc, set user state directly instead of re-fetching
+        setUser(newUser);
 
     } catch (error: any) {
         throw error;
@@ -274,8 +283,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
     try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle fetching user data
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged will handle fetching user data, so we don't need to do anything here.
+        // It's already triggered by signInWithEmailAndPassword.
     } catch (error: any) {
         throw error;
     }
@@ -285,8 +295,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) return;
     await signOut(auth);
     setUser(null);
-    setAllUsers([]);
-    setAllFeedback([]);
     router.push('/');
   };
 
@@ -323,7 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             Object.keys(newGameStats).forEach(key => {
                 if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
                     const statKey = key as keyof GameStats;
-                    if (typeof (gameStats as any)[statKey] === 'number') {
+                    if (typeof (gameStats as any)[statKey] === 'number' && typeof (newGameStats as any)[statKey] === 'number') {
                         (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
                     } else {
                         (gameStats as any)[statKey] = newGameStats[statKey];
@@ -346,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
             
             transaction.update(userDocRef, { stats: updatedUser.stats });
+            // Optimistically update local state for immediate UI feedback
             setUser(updatedUser);
         });
     } catch (e) {
