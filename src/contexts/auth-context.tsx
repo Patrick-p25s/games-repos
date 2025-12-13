@@ -93,6 +93,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ADMIN_EMAIL = 'admin@nextgen.games';
+
 // Définit les statistiques par défaut pour un nouvel utilisateur.
 const defaultStats: User['stats'] = {
   overall: {
@@ -176,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
         const userDoc = await getDoc(userDocRef);
         const email = firebaseUser.email || "";
-        const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
+        const isAdminUser = email.toLowerCase() === ADMIN_EMAIL;
 
         if (userDoc.exists()) {
             let userData = { id: userDoc.id, ...userDoc.data() } as User;
@@ -187,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
-            // This case should be handled by signup, but as a fallback:
+            // This case is a fallback for users created directly in Firebase console
             const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
@@ -258,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth || !db) throw new Error("Firebase not initialized.");
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
-    const isAdminUser = email.toLowerCase() === 'patricknomentsoa.p25s@gmail.com';
+    const isAdminUser = email.toLowerCase() === ADMIN_EMAIL;
     
     const newUser: User = {
       id: firebaseUser.uid,
@@ -276,30 +278,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    // Let onAuthStateChanged handle setting the user state
+    // onAuthStateChanged will handle setting the user state, no need to call setUser here
   };
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            try {
-                const name = email.split('@')[0];
-                await signup(name, email, password);
-                // After signup, signIn will be handled by onAuthStateChanged
-            } catch (signupError: any) {
-                // If signup fails because email is in use, it means wrong password.
-                if (signupError.code === 'auth/email-already-in-use') {
-                    throw new Error("Invalid password.");
-                }
-                throw signupError;
-            }
-        } else {
-            throw error;
-        }
-    }
+    // This will trigger onAuthStateChanged which will then call fetchUserData
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
@@ -478,3 +463,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    
