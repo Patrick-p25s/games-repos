@@ -48,7 +48,7 @@ export default function LeaderboardPage() {
       const players = allUsers
         .filter(user => user.stats?.games?.[gameKey] && user.stats.games[gameKey].highScore > 0)
         .sort((a, b) => (b.stats?.games?.[gameKey]?.highScore ?? 0) - (a.stats?.games?.[gameKey]?.highScore ?? 0))
-        .slice(0, 3)
+        .slice(0, 10) // Afficher le Top 10 au lieu du Top 3
         .map((user, index) => ({
           rank: index + 1,
           player: user.name,
@@ -95,7 +95,7 @@ export default function LeaderboardPage() {
                   <CardTitle className="text-2xl font-headline">
                     {t(board.game.toLowerCase().replace(' ', ''))} {t('leaderboard')}
                   </CardTitle>
-                  <CardDescription>{t('top3Players')}</CardDescription>
+                  <CardDescription>{t('topPlayers')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {board.players.length > 0 ? (
