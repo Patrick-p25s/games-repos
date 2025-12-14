@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -44,19 +45,28 @@ export default function LeaderboardPage() {
 
   const leaderboardData: GameLeaderboard[] = useMemo(() => {
     return GAME_KEYS.map(gameKey => {
-      const players = allUsers
-        .filter(user => user?.stats?.games?.[gameKey]?.highScore > 0)
-        .sort((a, b) => (b.stats?.games?.[gameKey]?.highScore ?? 0) - (a.stats?.games?.[gameKey]?.highScore ?? 0))
-        .slice(0, 10)
-        .map((user, index) => ({
-          rank: index + 1,
-          player: user.name,
-          score: user.stats.games[gameKey].highScore,
-        }));
+      const playersWithScores = allUsers
+        .map(user => {
+          // Safely access nested properties
+          const score = user?.stats?.games?.[gameKey]?.highScore;
+          return {
+            name: user?.name,
+            score: score ?? 0, // Default to 0 if score is not found
+          };
+        })
+        .filter(player => player.name && player.score > 0); // Ensure player has a name and a score greater than 0
+
+      const sortedPlayers = playersWithScores.sort((a, b) => b.score - a.score);
+      
+      const topPlayers = sortedPlayers.slice(0, 10).map((player, index) => ({
+        rank: index + 1,
+        player: player.name!,
+        score: player.score,
+      }));
 
       return {
         game: gameKey,
-        players: players,
+        players: topPlayers,
       };
     });
   }, [allUsers]);
