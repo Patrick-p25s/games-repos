@@ -13,6 +13,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Use email for reliable admin identification, as it's set at creation and unchangeable.
       return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 

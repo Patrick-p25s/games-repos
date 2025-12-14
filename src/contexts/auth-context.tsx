@@ -425,25 +425,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const newStats = JSON.parse(JSON.stringify(defaultStats));
     
-    await runTransaction(db, async (transaction) => {
-        transaction.update(userDocRef, { stats: newStats });
-        
-        const leaderboardDoc = await transaction.get(leaderboardDocRef);
-        if (leaderboardDoc.exists()) {
-            const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
-            const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
-            if (userIndex > -1) {
-                leaderboardUsers[userIndex].stats = newStats;
-                transaction.update(leaderboardDocRef, { users: leaderboardUsers });
-            }
-        }
-    }).catch(error => {
+    try {
+      await runTransaction(db, async (transaction) => {
+          transaction.update(userDocRef, { stats: newStats });
+          
+          const leaderboardDoc = await transaction.get(leaderboardDocRef);
+          if (leaderboardDoc.exists()) {
+              const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
+              const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
+              if (userIndex > -1) {
+                  leaderboardUsers[userIndex].stats = newStats;
+                  transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+              }
+          }
+      });
+      setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
+    } catch (error) {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: newStats } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
-    });
-
-    setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
+    }
   };
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
