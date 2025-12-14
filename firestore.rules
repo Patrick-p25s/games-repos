@@ -13,8 +13,6 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check if the signed-in user's email is the admin email.
-      // This is more reliable than checking a role in the document, which might not exist yet or be unreadable.
       return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 
@@ -27,6 +25,8 @@ service cloud.firestore {
       return isOwner && isNotAssigningRole;
     }
     
+    // On update, a user can only change their own 'name', 'avatar', and 'stats'.
+    // All other fields like 'role' or 'email' must remain unchanged.
     function isUpdatingOwnSafeFields(userId) {
       let isOwner = isOwner(userId);
       let incomingData = request.resource.data;

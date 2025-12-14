@@ -304,6 +304,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
             }
         }
+    }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: leaderboardDocRef.path, operation: 'write', requestResourceData: { users: '...' }});
+        errorEmitter.emit('permission-error', contextualError);
+        throw error;
     });
 
   };
@@ -403,6 +407,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                  transaction.update(leaderboardDocRef, { users: [...leaderboardUsers, { id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
             }
+        } else {
+            transaction.set(leaderboardDocRef, { users: [{ id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
         }
       });
     } catch (e) {
