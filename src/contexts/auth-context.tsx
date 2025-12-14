@@ -285,20 +285,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
     try {
-        const batch = writeBatch(db);
-        batch.set(userDocRef, newUser);
+        await runTransaction(db, async (transaction) => {
+            const leaderboardDoc = await transaction.get(leaderboardDocRef);
+            
+            transaction.set(userDocRef, newUser);
 
-        const leaderboardDoc = await getDoc(leaderboardDocRef);
-        const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
+            const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
 
-        if (!leaderboardDoc.exists()) {
-            batch.set(leaderboardDocRef, { users: [newLeaderboardUser] });
-        } else {
-            const currentUsers = leaderboardDoc.data().users || [];
-            batch.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
-        }
-        
-        await batch.commit();
+            if (!leaderboardDoc.exists()) {
+                transaction.set(leaderboardDocRef, { users: [newLeaderboardUser] });
+            } else {
+                const currentUsers = leaderboardDoc.data().users || [];
+                transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
+            }
+        });
 
     } catch (e) {
         handleError(e, "Signup failed during database setup.");
