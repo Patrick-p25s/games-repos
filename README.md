@@ -50,3 +50,35 @@ npm run genkit:dev
 ```
 
 This will start the Genkit development server, allowing you to inspect and test your AI flows at [http://localhost:4000](http://localhost:4000).
+
+---
+
+## Updating and Deploying the Application
+
+### How to Update
+
+The easiest way to update the application is to continue the conversation with the AI assistant in Firebase Studio. You can request:
+- New features
+- Bug fixes
+- Design changes
+- Code optimizations
+
+The assistant will make the necessary code changes, which you can test in the development environment.
+
+### Deploying to Production with Firebase Hosting
+
+Once you are satisfied with the updates, you need to deploy them to make them live for your users. This project is set up to be deployed with **Firebase Hosting**.
+
+1.  **Build the Application:**
+    This command creates an optimized, production-ready version of your app in the `.next` folder.
+    ```bash
+    npm run build
+    ```
+
+2.  **Deploy to Firebase:**
+    This command uploads the built application to Firebase Hosting. You will need to have the Firebase CLI installed and be logged into your Firebase account.
+    ```bash
+    firebase deploy --only hosting
+    ```
+
+After the deployment is complete, your updated application will be live at your Firebase Hosting URL.
