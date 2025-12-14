@@ -115,7 +115,7 @@ const defaultStats: User['stats'] = {
   games: {
     Quiz: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, avgAccuracy: 0, totalCorrect: 0, totalQuestions: 0 },
     Tetris: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, linesCleared: 0 },
-    Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 1 },
+    Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 0 },
     "Flippy Bird": { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, pipesPassed: 0 },
     Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
     Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
@@ -262,9 +262,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchLeaderboardData]);
   
   useEffect(() => {
-    if (user?.role === 'admin') {
+    // Only fetch admin data if a user is logged in and is an admin.
+    if (user && user.role === 'admin') {
       fetchAdminData();
     } else {
+      // If the user is not an admin or is logged out, clear admin-specific data.
       setAllUsers([]);
       setAllFeedback([]);
     }
@@ -339,15 +341,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = async (newDetails: Partial<User>) => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
-    await updateDoc(userDocRef, newDetails).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: newDetails });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    
-    if (newDetails.name) {
-        const leaderboardDocRef = doc(db, 'leaderboards', 'all');
-        await runTransaction(db, async (transaction) => {
+    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+
+    await runTransaction(db, async (transaction) => {
+        // Update the user's main document
+        transaction.update(userDocRef, newDetails);
+
+        // If the name was changed, update it in the leaderboards document as well
+        if (newDetails.name) {
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
             if (leaderboardDoc.exists()) {
                 const currentUsers = leaderboardDoc.data().users as LeaderboardUser[];
@@ -357,11 +358,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     transaction.update(leaderboardDocRef, { users: currentUsers });
                 }
             }
-        });
-    }
+        }
+    }).catch(error => {
+        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: newDetails });
+        errorEmitter.emit('permission-error', contextualError);
+        throw error;
+    });
 
     setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
-  };
+    await fetchLeaderboardData(); // Refetch to ensure UI consistency
+};
   
   const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
     if (!user || !db) return;

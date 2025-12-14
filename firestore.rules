@@ -17,12 +17,15 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // On create, ensure the user ID in the document being created matches the authenticated user's ID
+    // and that they are not trying to give themselves a role.
     function isCreatingOwnDocument(userId) {
-      // Ensure the user ID in the document being created matches the authenticated user's ID
-      return isOwner(userId) && request.resource.data.id == userId;
+      let isOwner = isOwner(userId);
+      let isNotAssigningRole = !('role' in request.resource.data);
+      return isOwner && isNotAssigningRole;
     }
     
-    // Allow a user to update only their own 'name', 'avatar', and 'stats'.
+    // On update, allow a user to update only their own 'name', 'avatar', and 'stats'.
     function isUpdatingOwnSafeFields(userId) {
       let isOwner = isOwner(userId);
       let incomingData = request.resource.data;
@@ -30,13 +33,12 @@ service cloud.firestore {
 
       // List of fields the user is allowed to change.
       let allowedFields = ['name', 'avatar', 'stats'];
-      // The keys in the incoming data.
       let incomingKeys = incomingData.keys();
       
-      // Ensure the user is only trying to change the fields they are allowed to.
-      let changesAllowed = incomingKeys.hasAll(allowedFields) && incomingKeys.size() <= allowedFields.size();
+      // Check if all incoming keys are in the allowed list of fields.
+      let changesAllowed = incomingKeys.hasAll(allowedFields);
       
-      // Ensure non-editable fields remain unchanged.
+      // Ensure non-editable fields remain unchanged by comparing them to existing data.
       let roleUnchanged = incomingData.role == existingData.role;
       let emailUnchanged = incomingData.email == existingData.email;
       let idUnchanged = incomingData.id == existingData.id;

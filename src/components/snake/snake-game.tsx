@@ -31,13 +31,10 @@ export function SnakeGame() {
   const [direction, setDirection] = useState<Direction>('RIGHT');
   const [speed, setSpeed] = useState<number>(INITIAL_SPEED);
   const [score, setScore] = useState(0);
-  const [applesEaten, setApplesEaten] = useState(0); // Suivi séparé des pommes
   const [highScore, setHighScore] = useState(0);
-  const [time, setTime] = useState(0);
   
   // Références pour les boucles de jeu et le temps
   const gameLoopRef = useRef<NodeJS.Timeout>();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const [statsUpdated, setStatsUpdated] = useState(false);
 
@@ -63,8 +60,6 @@ export function SnakeGame() {
     setDirection('RIGHT');
     setSpeed(INITIAL_SPEED);
     setScore(0);
-    setApplesEaten(0);
-    setTime(0);
     setStatsUpdated(false);
   }, [createFood]);
 
@@ -80,7 +75,6 @@ export function SnakeGame() {
     if (gameState === 'over') return;
     setGameState('over');
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
   }, [gameState]);
 
   // Met à jour les statistiques de l'utilisateur lorsque la partie est terminée
@@ -90,11 +84,11 @@ export function SnakeGame() {
         updateUserStats('Snake', {
             highScore: score,
             totalPlaytime: playtimeInSeconds,
-            applesEaten: applesEaten,
+            applesEaten: score,
         });
         setStatsUpdated(true);
     }
-  }, [gameState, user, score, applesEaten, updateUserStats, statsUpdated]);
+  }, [gameState, user, score, updateUserStats, statsUpdated]);
 
 
   // Charge le meilleur score de l'utilisateur au montage
@@ -121,8 +115,7 @@ export function SnakeGame() {
 
         // Gère la collision avec la nourriture
         if (head.x === food.x && head.y === food.y) {
-            setScore(s => s + 10); // Chaque pomme vaut 10 points
-            setApplesEaten(a => a + 1);
+            setScore(s => s + 1);
             setFood(createFood(newSnake));
             setSpeed(s => Math.max(50, s - 2)); // Augmente la vitesse
         } else {
@@ -160,18 +153,8 @@ export function SnakeGame() {
     if (gameState === 'playing') {
       gameLoopRef.current = setInterval(moveSnake, speed);
       
-      timerRef.current = setInterval(() => {
-        if(startTimeRef.current){
-          setTime(Math.round((Date.now() - startTimeRef.current) / 1000));
-        }
-      }, 1000);
-
       return () => {
         if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
       };
     }
   }, [gameState, moveSnake, speed, endGame]);
@@ -287,10 +270,6 @@ export function SnakeGame() {
     )
   }
 
-  // Formatage du temps pour l'affichage
-  const minutes = Math.floor(time / 60).toString().padStart(2, '0');
-  const seconds = (time % 60).toString().padStart(2, '0');
-
   // Rendu principal du jeu en cours
   return (
     <div className="container flex flex-col items-center justify-center min-h-screen py-8 bg-gray-100 dark:bg-gray-900">
@@ -298,7 +277,6 @@ export function SnakeGame() {
             <h1 className="text-4xl font-bold font-headline">{t('snake')}</h1>
             <div className="flex gap-8 text-2xl mt-2">
                 <p>{t('score')}: <span className="font-bold">{score}</span></p>
-                <p>{t('time')}: <span className="font-mono">{minutes}:{seconds}</span></p>
             </div>
         </div>
         <div 
