@@ -9,7 +9,7 @@ import {
   User as FirebaseUser,
   FirebaseError,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
 
@@ -57,6 +57,13 @@ export type User = {
   inbox: InboxMessage[];
 }
 
+// Structure pour les données du classement public
+export type LeaderboardUser = {
+  id: string;
+  name: string;
+  stats: User['stats'];
+};
+
 // Définit la structure d'une soumission de feedback.
 export type Feedback = {
   id: string;
@@ -74,6 +81,7 @@ interface AuthContextType {
   user: User | null;
   allUsers: User[];
   allFeedback: Feedback[];
+  leaderboardData: LeaderboardUser[];
   isAdmin: boolean;
   viewCount: number;
   isLoaded: boolean;
@@ -107,7 +115,7 @@ const defaultStats: User['stats'] = {
   games: {
     Quiz: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, avgAccuracy: 0, totalCorrect: 0, totalQuestions: 0 },
     Tetris: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, linesCleared: 0 },
-    Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 0 },
+    Snake: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, applesEaten: 1 },
     "Flippy Bird": { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, pipesPassed: 0 },
     Memory: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
     Puzzle: { gamesPlayed: 0, highScore: 0, totalPlaytime: 0, bestTime: 0 },
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [viewCount, setViewCount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const router = useRouter();
@@ -232,18 +241,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
     }
   }, [db]);
+
+  const fetchLeaderboardData = useCallback(async () => {
+    if (!db) return;
+    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+    try {
+      const docSnap = await getDoc(leaderboardDocRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLeaderboardData(data.users || []);
+      }
+    } catch (e) {
+        const contextualError = new FirestorePermissionError({ path: leaderboardDocRef.path, operation: 'get' });
+        errorEmitter.emit('permission-error', contextualError);
+    }
+  }, [db]);
+
+  useEffect(() => {
+    fetchLeaderboardData();
+  }, [fetchLeaderboardData]);
   
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchAdminData();
     } else {
-      // Clear admin-specific data if the user is not an admin
       setAllUsers([]);
       setAllFeedback([]);
     }
   }, [user, fetchAdminData]);
 
-  // Centralized auth state listener. This is the source of truth.
   useEffect(() => {
     if (!auth) {
         setIsLoaded(true);
@@ -255,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
       }
-      setIsLoaded(true); // Mark as loaded only after user state is fully resolved.
+      setIsLoaded(true);
     });
     return () => unsubscribe();
   }, [auth, fetchUserData]);
@@ -283,7 +309,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    // onAuthStateChanged will handle setting the user state.
+    
+    // Also add to leaderboards document
+    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+    await runTransaction(db, async (transaction) => {
+        const leaderboardDoc = await transaction.get(leaderboardDocRef);
+        const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
+        if (!leaderboardDoc.exists()) {
+            transaction.set(leaderboardDocRef, { users: [newLeaderboardUser] });
+        } else {
+            const currentUsers = leaderboardDoc.data().users || [];
+            transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
+        }
+    });
+
   };
   
   const login = async (email: string, password: string) => {
@@ -294,7 +333,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     if (!auth) return;
     await signOut(auth);
-    // onAuthStateChanged will set user to null.
     router.push('/');
   };
 
@@ -306,73 +344,124 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
+    
+    if (newDetails.name) {
+        const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+        await runTransaction(db, async (transaction) => {
+            const leaderboardDoc = await transaction.get(leaderboardDocRef);
+            if (leaderboardDoc.exists()) {
+                const currentUsers = leaderboardDoc.data().users as LeaderboardUser[];
+                const userIndex = currentUsers.findIndex(u => u.id === user.id);
+                if (userIndex > -1) {
+                    currentUsers[userIndex].name = newDetails.name!;
+                    transaction.update(leaderboardDocRef, { users: currentUsers });
+                }
+            }
+        });
+    }
+
     setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
   };
   
   const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
-    
+    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) { throw "Document does not exist!"; }
-            
-            const currentUserData = userDoc.data() as User;
-            const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userDocRef);
+        if (!userDoc.exists()) { throw "Document does not exist!"; }
+        
+        const currentUserData = userDoc.data() as User;
+        const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
 
-            const gameStats = updatedUser.stats.games[gameName];
-            const overallStats = updatedUser.stats.overall;
+        const gameStats = updatedUser.stats.games[gameName];
+        const overallStats = updatedUser.stats.overall;
 
-            gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
-            gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-            gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
+        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
+        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
 
-            Object.keys(newGameStats).forEach(key => {
-                if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
-                    const statKey = key as keyof GameStats;
-                    if (typeof (gameStats as any)[statKey] === 'number' && typeof (newGameStats as any)[statKey] === 'number') {
-                        (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
-                    } else {
-                        (gameStats as any)[statKey] = newGameStats[statKey];
-                    }
+        Object.keys(newGameStats).forEach(key => {
+            if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
+                const statKey = key as keyof GameStats;
+                if (typeof (gameStats as any)[statKey] === 'number' && typeof (newGameStats as any)[statKey] === 'number') {
+                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                } else {
+                    (gameStats as any)[statKey] = newGameStats[statKey];
                 }
-            });
-
-            if (gameName === 'Quiz') {
-                const quizStats = gameStats as User['stats']['games']['Quiz'];
-                quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
             }
-            
-            let isWin = (newGameStats.highScore ?? 0) > 0;
-            overallStats.totalGames = (overallStats.totalGames || 0) + 1;
-            if (isWin) { overallStats.totalWins = (overallStats.totalWins || 0) + 1; }
-            overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
-            overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
-
-            const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
-            overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
-            
-            transaction.update(userDocRef, { stats: updatedUser.stats });
-            setUser(updatedUser);
         });
+
+        if (gameName === 'Quiz') {
+            const quizStats = gameStats as User['stats']['games']['Quiz'];
+            quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
+        }
+        
+        let isWin = (newGameStats.highScore ?? 0) > 0;
+        overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+        if (isWin) { overallStats.totalWins = (overallStats.totalWins || 0) + 1; }
+        overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
+        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
+
+        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
+        overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
+        
+        // Update user document
+        transaction.update(userDocRef, { stats: updatedUser.stats });
+        setUser(updatedUser);
+
+        // Update leaderboard document
+        const leaderboardDoc = await transaction.get(leaderboardDocRef);
+        if (leaderboardDoc.exists()) {
+            const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
+            const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
+            if (userIndex > -1) {
+                leaderboardUsers[userIndex].stats = updatedUser.stats;
+                transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+            }
+        }
+      });
+      // After transaction, refetch leaderboard data to update UI
+      await fetchLeaderboardData();
+
     } catch (e) {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: '...' } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw e;
+      const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: '...' } });
+      errorEmitter.emit('permission-error', contextualError);
+      throw e;
     }
-  }, [user, db]);
+  }, [user, db, fetchLeaderboardData]);
   
   const resetStats = async () => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
+    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
+
     const newStats = JSON.parse(JSON.stringify(defaultStats));
-    await updateDoc(userDocRef, { stats: newStats }).catch(error => {
+    
+    await runTransaction(db, async (transaction) => {
+        // Reset user stats
+        transaction.update(userDocRef, { stats: newStats });
+        
+        // Reset stats in leaderboard
+        const leaderboardDoc = await transaction.get(leaderboardDocRef);
+        if (leaderboardDoc.exists()) {
+            const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
+            const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
+            if (userIndex > -1) {
+                leaderboardUsers[userIndex].stats = newStats;
+                transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+            }
+        }
+    }).catch(error => {
         const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: newStats } });
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
+
     setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
+    await fetchLeaderboardData();
   };
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
@@ -384,7 +473,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-    // This will be automatically re-fetched by the admin's useEffect
     if (isAdmin) {
         await fetchAdminData();
     }
@@ -423,7 +511,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
 
             const newInbox = [newInboxMessage, ...(userData.inbox || [])];
-
             transaction.update(userDocRef, { inbox: newInbox });
             transaction.delete(feedbackDocRef);
         });
@@ -469,6 +556,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
     sendReply, viewCount, incrementViewCount, deleteMessage, markMessageAsRead,
     signup,
+    leaderboardData,
     isLoaded
   };
   

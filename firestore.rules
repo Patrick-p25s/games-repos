@@ -63,5 +63,11 @@ service cloud.firestore {
       allow create, update: if true;
       allow delete: if false;
     }
+
+    // Allow public read for leaderboards, but only allow server/authed users to write.
+    match /leaderboards/all {
+      allow get: if true;
+      allow write: if isSignedIn(); 
+    }
   }
 }

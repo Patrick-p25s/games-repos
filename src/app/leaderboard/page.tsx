@@ -20,8 +20,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useLocale } from "@/contexts/locale-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useMemo } from "react";
-import type { User } from "@/contexts/auth-context";
-
+import type { LeaderboardUser } from "@/contexts/auth-context";
 
 type Player = {
   rank: number;
@@ -34,30 +33,32 @@ type GameLeaderboard = {
   players: Player[];
 };
 
-type GameKey = keyof User['stats']['games'];
+type GameKey = keyof LeaderboardUser['stats']['games'];
 
 const GAME_KEYS: GameKey[] = ["Quiz", "Tetris", "Snake", "Flippy Bird", "Memory", "Puzzle"];
 
 
 export default function LeaderboardPage() {
   const { t } = useLocale();
-  const { allUsers } = useAuth();
+  const { leaderboardData: allUsers } = useAuth();
 
   const leaderboardData: GameLeaderboard[] = useMemo(() => {
     return GAME_KEYS.map(gameKey => {
+      // 1. Map users to a player object with a score, filtering out those with no score or score of 0
       const playersWithScores = allUsers
         .map(user => {
-          // Safely access nested properties
-          const score = user?.stats?.games?.[gameKey]?.highScore;
+          const score = user?.stats?.games?.[gameKey]?.highScore ?? 0;
           return {
             name: user?.name,
-            score: score ?? 0, // Default to 0 if score is not found
+            score: score,
           };
         })
-        .filter(player => player.name && player.score > 0); // Ensure player has a name and a score greater than 0
+        .filter(player => player.name && player.score > 0);
 
+      // 2. Sort the valid players by score in descending order
       const sortedPlayers = playersWithScores.sort((a, b) => b.score - a.score);
       
+      // 3. Take the top 10 and map them to the final Player format with a rank
       const topPlayers = sortedPlayers.slice(0, 10).map((player, index) => ({
         rank: index + 1,
         player: player.name!,
