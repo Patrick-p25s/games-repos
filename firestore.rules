@@ -13,31 +13,20 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Use email for reliable admin identification, as it's set at creation and unchangeable.
+      // Use email for reliable admin identification.
       return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 
-    // On create, ensure the user ID in the document being created matches the authenticated user's ID
-    // and that they are not trying to give themselves a role other than 'user'.
-    function isCreatingOwnDocument(userId) {
-      let isOwner = isOwner(userId);
-      // The role must either not be present or be explicitly 'user'.
-      let isNotAssigningRole = !('role' in request.resource.data) || request.resource.data.role == 'user';
-      return isOwner && isNotAssigningRole;
-    }
-    
-    // On update, a user can only change their own 'name', 'avatar', and 'stats'.
-    // All other fields like 'role' or 'email' must remain unchanged.
     function isUpdatingOwnSafeFields(userId) {
       let isOwner = isOwner(userId);
       let incomingData = request.resource.data;
       let existingData = resource.data;
-
+      
       // List of fields the user is allowed to change.
       let allowedFields = ['name', 'avatar', 'stats'];
       let incomingKeys = incomingData.keys();
       
-      // Ensure all incoming keys are a SUBSET of the allowed fields.
+      // Ensure all keys in the request are a subset of the allowed fields.
       let changesAllowed = incomingKeys.hasOnly(allowedFields);
       
       // Ensure non-editable fields remain unchanged by comparing them to existing data.
@@ -47,13 +36,19 @@ service cloud.firestore {
 
       return isOwner && changesAllowed && roleUnchanged && emailUnchanged && idUnchanged;
     }
+    
+    function isCreatingOwnDocument(userId) {
+        let isOwner = isOwner(userId);
+        let isNotAssigningRole = !('role' in request.resource.data) || request.resource.data.role == 'user';
+        return isOwner && isNotAssigningRole;
+    }
 
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isCreatingOwnDocument(userId);
       allow update: if isUpdatingOwnSafeFields(userId) || isAdmin();
-      allow delete: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
 
       match /scores/{scoreId} {
         allow read, list, write: if isOwner(userId) || isAdmin();
@@ -80,12 +75,11 @@ service cloud.firestore {
     }
 
     match /app-stats/{statId} {
-      allow get, list: if true;
-      allow create, update: if true; // Allows anyone to increment the counter
+      allow get: if true;
+      allow write: if true;
       allow delete: if false;
     }
 
-    // Allow public read for leaderboards, but only allow authenticated users to write (via transactions).
     match /leaderboards/all {
       allow get: if true;
       allow write: if isSignedIn(); 

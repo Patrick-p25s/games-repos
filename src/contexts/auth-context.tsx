@@ -7,11 +7,11 @@ import {
   signInWithEmailAndPassword,
   signOut,
   User as FirebaseUser,
-  FirebaseError,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTransaction, addDoc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { useAuth as useFirebaseAuth, useFirestore, FirestorePermissionError, errorEmitter } from '@/firebase';
+import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 // Définit la structure des statistiques pour chaque jeu.
 type GameStats = {
@@ -132,6 +132,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const auth = useFirebaseAuth();
   const db = useFirestore();
+  const { toast } = useToast();
+
+  const handleError = (error: any, defaultMessage: string = "An unexpected error occurred.") => {
+    console.error("Firebase operation failed:", error);
+    toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || defaultMessage,
+    });
+  };
 
   const fetchViewCount = useCallback(async () => {
     if (!db) return;
@@ -141,15 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (docSnap.exists()) {
           setViewCount(docSnap.data().count);
       } else {
-          await setDoc(viewCounterRef, { count: 0 }).catch(error => {
-              const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'create', requestResourceData: { count: 0 } });
-              errorEmitter.emit('permission-error', contextualError);
-          });
+          await setDoc(viewCounterRef, { count: 0 });
           setViewCount(0);
       }
     } catch (e) {
-      const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'get' });
-      errorEmitter.emit('permission-error', contextualError);
+      // Silent fail for view count
     }
   }, [db]);
   
@@ -173,11 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         });
     } catch (e) {
-        const contextualError = new FirestorePermissionError({ path: viewCounterRef.path, operation: 'update', requestResourceData: { count: viewCount + 1 } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw e;
+        // Silent fail is acceptable here
     }
-}, [db, viewCount]);
+  }, [db]);
 
 
  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
@@ -198,7 +202,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
-            // This case is for new users or fallback.
             const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
             const newUser: User = {
                 id: firebaseUser.uid,
@@ -209,16 +212,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 stats: JSON.parse(JSON.stringify(defaultStats)),
                 inbox: [],
             };
-            await setDoc(userDocRef, newUser).catch(error => {
-                const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
-                errorEmitter.emit('permission-error', contextualError);
-            });
+            await setDoc(userDocRef, newUser);
             setUser(newUser);
             return newUser;
         }
     } catch (e) {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
-        errorEmitter.emit('permission-error', contextualError);
+        handleError(e, "Failed to fetch user data.");
         return null;
     }
 }, [db]);
@@ -235,17 +234,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const feedbackSnapshot = await getDocs(feedbackCollection);
         setAllFeedback(feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback)));
     } catch(e) {
-         const contextualError = new FirestorePermissionError({ path: 'users or feedback', operation: 'list' });
-        errorEmitter.emit('permission-error', contextualError);
+         handleError(e, "Could not fetch admin data.");
     }
   }, [db]);
   
   useEffect(() => {
-    // Only fetch admin data if a user is logged in and is an admin.
     if (user && user.role === 'admin') {
       fetchAdminData();
     } else {
-      // If the user is not an admin or is logged out, clear admin-specific data.
       setAllUsers([]);
       setAllFeedback([]);
     }
@@ -285,31 +281,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    await setDoc(userDocRef, newUser).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'create', requestResourceData: newUser });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
-    await runTransaction(db, async (transaction) => {
-        const leaderboardDoc = await transaction.get(leaderboardDocRef);
+
+    try {
+        const batch = writeBatch(db);
+        batch.set(userDocRef, newUser);
+
+        const leaderboardDoc = await getDoc(leaderboardDocRef);
         const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
+
         if (!leaderboardDoc.exists()) {
-            transaction.set(leaderboardDocRef, { users: [newLeaderboardUser] });
+            batch.set(leaderboardDocRef, { users: [newLeaderboardUser] });
         } else {
             const currentUsers = leaderboardDoc.data().users || [];
-            const existingUserIndex = currentUsers.findIndex(u => u.id === newUser.id);
-            if (existingUserIndex === -1) {
-                transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
-            }
+            batch.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
         }
-    }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: leaderboardDocRef.path, operation: 'write', requestResourceData: { users: '...' }});
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
+        
+        await batch.commit();
 
+    } catch (e) {
+        handleError(e, "Signup failed during database setup.");
+        throw e;
+    }
   };
   
   const login = async (email: string, password: string) => {
@@ -328,7 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userDocRef = doc(db, 'users', user.id);
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
-    await runTransaction(db, async (transaction) => {
+    try {
+      await runTransaction(db, async (transaction) => {
         transaction.update(userDocRef, newDetails);
         if (newDetails.name) {
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
@@ -341,13 +335,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             }
         }
-    }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: newDetails });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
-};
+      });
+      setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
+    } catch(e) {
+      handleError(e, "Failed to update profile.");
+    }
+  };
   
   const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
     if (!user || !db) return;
@@ -412,17 +405,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
     } catch (e) {
-      const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: '...' } });
-      errorEmitter.emit('permission-error', contextualError);
-      throw e;
+        handleError(e, "Failed to update game stats.");
+        throw e;
     }
-  }, [user, db]);
+  }, [user, db, handleError]);
   
   const resetStats = async () => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
-
     const newStats = JSON.parse(JSON.stringify(defaultStats));
     
     try {
@@ -440,36 +431,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
       });
       setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
-    } catch (error) {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: newStats } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
+    } catch (e) {
+        handleError(e, "Failed to reset stats.");
+        throw e;
     }
   };
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user || !db) throw new Error("User not logged in or Firebase not initialized.");
     const newFeedback = { ...feedbackData, userId: user.id, date: new Date().toISOString() };
-    const feedbackCollectionRef = collection(db, 'feedback');
-    await addDoc(feedbackCollectionRef, newFeedback).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: feedbackCollectionRef.path, operation: 'create', requestResourceData: newFeedback });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    if (isAdmin) {
-        await fetchAdminData();
+    try {
+        const feedbackCollectionRef = collection(db, 'feedback');
+        await addDoc(feedbackCollectionRef, newFeedback);
+        if (isAdmin) {
+            await fetchAdminData();
+        }
+    } catch (e) {
+        handleError(e, "Failed to submit feedback.");
     }
   };
 
   const deleteFeedback = async (feedbackId: string) => {
     if (!db || !isAdmin) return;
-    const feedbackDocRef = doc(db, 'feedback', feedbackId);
-    await deleteDoc(feedbackDocRef).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: feedbackDocRef.path, operation: 'delete' });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    setAllFeedback(current => current.filter(f => f.id !== feedbackId));
+    try {
+        const feedbackDocRef = doc(db, 'feedback', feedbackId);
+        await deleteDoc(feedbackDocRef);
+        setAllFeedback(current => current.filter(f => f.id !== feedbackId));
+    } catch (e) {
+        handleError(e, "Failed to delete feedback.");
+    }
   };
 
   const sendReply = async (userId: string, subject: string, message: string, originalFeedbackId: string) => {
@@ -501,9 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAllFeedback(current => current.filter(f => f.id !== originalFeedbackId));
 
     } catch (e) {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: '...' } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw e;
+        handleError(e, "Failed to send reply.");
     }
 };
 
@@ -511,24 +499,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || !db) return;
     const updatedInbox = user.inbox.filter(msg => msg.id !== messageId);
     const userDocRef = doc(db, 'users', user.id);
-    await updateDoc(userDocRef, { inbox: updatedInbox }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+    try {
+      await updateDoc(userDocRef, { inbox: updatedInbox });
+      setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+    } catch(e) {
+      handleError(e, "Failed to delete message.");
+    }
   };
   
   const markMessageAsRead = async (messageId: string) => {
     if (!user || !db) return;
     const updatedInbox = user.inbox.map(msg => msg.id === messageId ? {...msg, read: true} : msg);
     const userDocRef = doc(db, 'users', user.id);
-    await updateDoc(userDocRef, { inbox: updatedInbox }).catch(error => {
-        const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { inbox: updatedInbox } });
-        errorEmitter.emit('permission-error', contextualError);
-        throw error;
-    });
-    setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+    try {
+      await updateDoc(userDocRef, { inbox: updatedInbox });
+      setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
+    } catch(e) {
+      handleError(e, "Failed to mark message as read.");
+    }
   }
 
   const isLoggedIn = !!user;
