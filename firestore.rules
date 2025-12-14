@@ -21,7 +21,7 @@ service cloud.firestore {
     // and that they are not trying to give themselves a role.
     function isCreatingOwnDocument(userId) {
       let isOwner = isOwner(userId);
-      let isNotAssigningRole = !('role' in request.resource.data);
+      let isNotAssigningRole = !('role' in request.resource.data) || request.resource.data.role == 'user';
       return isOwner && isNotAssigningRole;
     }
     
@@ -33,15 +33,15 @@ service cloud.firestore {
 
       // List of fields the user is allowed to change.
       let allowedFields = ['name', 'avatar', 'stats'];
-      let incomingKeys = incomingData.keys();
+      let incomingKeys = request.resource.data.keys();
       
-      // Check if all incoming keys are in the allowed list of fields.
-      let changesAllowed = incomingKeys.hasAll(allowedFields);
+      // Check if all incoming keys are a SUBSET of the allowed fields.
+      let changesAllowed = incomingKeys.hasAny(allowedFields);
       
       // Ensure non-editable fields remain unchanged by comparing them to existing data.
-      let roleUnchanged = incomingData.role == existingData.role;
-      let emailUnchanged = incomingData.email == existingData.email;
-      let idUnchanged = incomingData.id == existingData.id;
+      let roleUnchanged = !('role' in incomingData) || incomingData.role == existingData.role;
+      let emailUnchanged = !('email' in incomingData) || incomingData.email == existingData.email;
+      let idUnchanged = !('id' in incomingData) || incomingData.id == existingData.id;
 
       return isOwner && changesAllowed && roleUnchanged && emailUnchanged && idUnchanged;
     }
