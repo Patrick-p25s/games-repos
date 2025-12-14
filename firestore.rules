@@ -22,16 +22,33 @@ service cloud.firestore {
       return isOwner(userId) && request.resource.data.id == userId;
     }
     
-    function isUpdatingOwnDocument(userId) {
-        // Ensure the user is the owner. Specific field validation should be done in rules below.
-        return isOwner(userId);
+    // Allow a user to update only their own 'name', 'avatar', and 'stats'.
+    function isUpdatingOwnSafeFields(userId) {
+      let isOwner = isOwner(userId);
+      let incomingData = request.resource.data;
+      let existingData = resource.data;
+
+      // List of fields the user is allowed to change.
+      let allowedFields = ['name', 'avatar', 'stats'];
+      // The keys in the incoming data.
+      let incomingKeys = incomingData.keys();
+      
+      // Ensure the user is only trying to change the fields they are allowed to.
+      let changesAllowed = incomingKeys.hasAll(allowedFields) && incomingKeys.size() <= allowedFields.size();
+      
+      // Ensure non-editable fields remain unchanged.
+      let roleUnchanged = incomingData.role == existingData.role;
+      let emailUnchanged = incomingData.email == existingData.email;
+      let idUnchanged = incomingData.id == existingData.id;
+
+      return isOwner && changesAllowed && roleUnchanged && emailUnchanged && idUnchanged;
     }
 
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isCreatingOwnDocument(userId);
-      allow update: if isUpdatingOwnDocument(userId) || isAdmin();
+      allow update: if isUpdatingOwnSafeFields(userId) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
 
       match /scores/{scoreId} {
@@ -60,11 +77,11 @@ service cloud.firestore {
 
     match /app-stats/{statId} {
       allow get, list: if true;
-      allow create, update: if true;
+      allow create, update: if true; // Allows anyone to increment the counter
       allow delete: if false;
     }
 
-    // Allow public read for leaderboards, but only allow server/authed users to write.
+    // Allow public read for leaderboards, but only allow authenticated users to write (via transactions).
     match /leaderboards/all {
       allow get: if true;
       allow write: if isSignedIn(); 
