@@ -71,8 +71,9 @@ export default function LeaderboardPage() {
     });
   }, [allUsers]);
   
-  const defaultTab = leaderboardData.find(board => board.players.length > 0)?.game || (leaderboardData.length > 0 ? leaderboardData[0].game : "");
-
+  const hasAnyLeaderboardData = useMemo(() => leaderboardData.some(board => board.players.length > 0), [leaderboardData]);
+  const defaultTab = useMemo(() => leaderboardData.find(board => board.players.length > 0)?.game || GAME_KEYS[0], [leaderboardData]);
+  
   if (isLoading) {
     return (
       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -90,7 +91,7 @@ export default function LeaderboardPage() {
         </p>
       </div>
 
-      {leaderboardData.length > 0 && defaultTab ? (
+      {hasAnyLeaderboardData ? (
         <Tabs defaultValue={defaultTab} className="w-full">
           <ScrollArea className="w-full whitespace-nowrap">
               <TabsList className="mb-8">
