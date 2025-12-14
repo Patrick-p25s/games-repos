@@ -90,7 +90,7 @@ export default function LeaderboardPage() {
         </p>
       </div>
 
-      {leaderboardData.length > 0 ? (
+      {leaderboardData.length > 0 && defaultTab ? (
         <Tabs defaultValue={defaultTab} className="w-full">
           <ScrollArea className="w-full whitespace-nowrap">
               <TabsList className="mb-8">

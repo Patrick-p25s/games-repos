@@ -25,7 +25,6 @@ service cloud.firestore {
       return isOwner && isNotAssigningRole;
     }
     
-    // On update, allow a user to update only their own 'name', 'avatar', and 'stats'.
     function isUpdatingOwnSafeFields(userId) {
       let isOwner = isOwner(userId);
       let incomingData = request.resource.data;
@@ -35,8 +34,8 @@ service cloud.firestore {
       let allowedFields = ['name', 'avatar', 'stats'];
       let incomingKeys = request.resource.data.keys();
       
-      // Check if all incoming keys are a SUBSET of the allowed fields.
-      let changesAllowed = incomingKeys.hasAny(allowedFields);
+      // Ensure all incoming keys are a SUBSET of the allowed fields.
+      let changesAllowed = incomingKeys.hasOnly(allowedFields);
       
       // Ensure non-editable fields remain unchanged by comparing them to existing data.
       let roleUnchanged = !('role' in incomingData) || incomingData.role == existingData.role;

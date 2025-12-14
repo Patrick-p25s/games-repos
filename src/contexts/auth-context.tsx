@@ -81,7 +81,6 @@ interface AuthContextType {
   user: User | null;
   allUsers: User[];
   allFeedback: Feedback[];
-  leaderboardData: LeaderboardUser[];
   isAdmin: boolean;
   viewCount: number;
   isLoaded: boolean;
@@ -128,7 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [viewCount, setViewCount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const router = useRouter();
@@ -241,25 +239,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
     }
   }, [db]);
-
-  const fetchLeaderboardData = useCallback(async () => {
-    if (!db) return;
-    const leaderboardDocRef = doc(db, 'leaderboards', 'all');
-    try {
-      const docSnap = await getDoc(leaderboardDocRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setLeaderboardData(data.users || []);
-      }
-    } catch (e) {
-        const contextualError = new FirestorePermissionError({ path: leaderboardDocRef.path, operation: 'get' });
-        errorEmitter.emit('permission-error', contextualError);
-    }
-  }, [db]);
-
-  useEffect(() => {
-    fetchLeaderboardData();
-  }, [fetchLeaderboardData]);
   
   useEffect(() => {
     // Only fetch admin data if a user is logged in and is an admin.
@@ -312,7 +291,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
     });
     
-    // Also add to leaderboards document
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
     await runTransaction(db, async (transaction) => {
         const leaderboardDoc = await transaction.get(leaderboardDocRef);
@@ -321,7 +299,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             transaction.set(leaderboardDocRef, { users: [newLeaderboardUser] });
         } else {
             const currentUsers = leaderboardDoc.data().users || [];
-            transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
+            const existingUserIndex = currentUsers.findIndex(u => u.id === newUser.id);
+            if (existingUserIndex === -1) {
+                transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
+            }
         }
     });
 
@@ -344,10 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
     await runTransaction(db, async (transaction) => {
-        // Update the user's main document
         transaction.update(userDocRef, newDetails);
-
-        // If the name was changed, update it in the leaderboards document as well
         if (newDetails.name) {
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
             if (leaderboardDoc.exists()) {
@@ -364,9 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorEmitter.emit('permission-error', contextualError);
         throw error;
     });
-
     setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
-    await fetchLeaderboardData(); // Refetch to ensure UI consistency
 };
   
   const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
@@ -414,11 +390,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
         overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
         
-        // Update user document
         transaction.update(userDocRef, { stats: updatedUser.stats });
         setUser(updatedUser);
 
-        // Update leaderboard document
         const leaderboardDoc = await transaction.get(leaderboardDocRef);
         if (leaderboardDoc.exists()) {
             const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
@@ -426,18 +400,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (userIndex > -1) {
                 leaderboardUsers[userIndex].stats = updatedUser.stats;
                 transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+            } else {
+                 transaction.update(leaderboardDocRef, { users: [...leaderboardUsers, { id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
             }
         }
       });
-      // After transaction, refetch leaderboard data to update UI
-      await fetchLeaderboardData();
-
     } catch (e) {
       const contextualError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { stats: '...' } });
       errorEmitter.emit('permission-error', contextualError);
       throw e;
     }
-  }, [user, db, fetchLeaderboardData]);
+  }, [user, db]);
   
   const resetStats = async () => {
     if (!user || !db) return;
@@ -447,10 +420,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newStats = JSON.parse(JSON.stringify(defaultStats));
     
     await runTransaction(db, async (transaction) => {
-        // Reset user stats
         transaction.update(userDocRef, { stats: newStats });
         
-        // Reset stats in leaderboard
         const leaderboardDoc = await transaction.get(leaderboardDocRef);
         if (leaderboardDoc.exists()) {
             const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
@@ -467,7 +438,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
-    await fetchLeaderboardData();
   };
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
@@ -562,7 +532,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserStats, resetStats, allFeedback, submitFeedback, deleteFeedback, 
     sendReply, viewCount, incrementViewCount, deleteMessage, markMessageAsRead,
     signup,
-    leaderboardData,
     isLoaded
   };
   
