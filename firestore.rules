@@ -13,14 +13,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check for the existence of the role field in the user's document and if it's 'admin'
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Check if the signed-in user's email is the admin email.
+      // This is more reliable than checking a role in the document, which might not exist yet or be unreadable.
+      return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 
     // On create, ensure the user ID in the document being created matches the authenticated user's ID
-    // and that they are not trying to give themselves a role.
+    // and that they are not trying to give themselves a role other than 'user'.
     function isCreatingOwnDocument(userId) {
       let isOwner = isOwner(userId);
+      // The role must either not be present or be explicitly 'user'.
       let isNotAssigningRole = !('role' in request.resource.data) || request.resource.data.role == 'user';
       return isOwner && isNotAssigningRole;
     }
@@ -32,7 +34,7 @@ service cloud.firestore {
 
       // List of fields the user is allowed to change.
       let allowedFields = ['name', 'avatar', 'stats'];
-      let incomingKeys = request.resource.data.keys();
+      let incomingKeys = incomingData.keys();
       
       // Ensure all incoming keys are a SUBSET of the allowed fields.
       let changesAllowed = incomingKeys.hasOnly(allowedFields);
