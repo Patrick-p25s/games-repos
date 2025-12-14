@@ -1,3 +1,4 @@
+
 // Ce fichier gère l'état d'authentification et les données des utilisateurs pour toute l'application.
 "use client"
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -323,16 +324,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await runTransaction(db, async (transaction) => {
+        // --- READ PHASE ---
+        const leaderboardDoc = await transaction.get(leaderboardDocRef);
+        
+        // --- WRITE PHASE ---
         transaction.update(userDocRef, newDetails);
-        if (newDetails.name) {
-            const leaderboardDoc = await transaction.get(leaderboardDocRef);
-            if (leaderboardDoc.exists()) {
-                const currentUsers = leaderboardDoc.data().users as LeaderboardUser[];
-                const userIndex = currentUsers.findIndex(u => u.id === user.id);
-                if (userIndex > -1) {
-                    currentUsers[userIndex].name = newDetails.name!;
-                    transaction.update(leaderboardDocRef, { users: currentUsers });
-                }
+        
+        if (newDetails.name && leaderboardDoc.exists()) {
+            const currentUsers = leaderboardDoc.data().users as LeaderboardUser[];
+            const userIndex = currentUsers.findIndex(u => u.id === user.id);
+            if (userIndex > -1) {
+                currentUsers[userIndex].name = newDetails.name!;
+                transaction.update(leaderboardDocRef, { users: currentUsers });
             }
         }
       });
@@ -342,100 +345,111 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
   
-  const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
+const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'], newGameStats: Partial<GameStats>) => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists()) { throw "Document does not exist!"; }
-        
-        const currentUserData = userDoc.data() as User;
-        const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
+        await runTransaction(db, async (transaction) => {
+            // --- READ PHASE ---
+            const userDoc = await transaction.get(userDocRef);
+            const leaderboardDoc = await transaction.get(leaderboardDocRef);
 
-        const gameStats = updatedUser.stats.games[gameName];
-        const overallStats = updatedUser.stats.overall;
+            if (!userDoc.exists()) {
+                throw "Document does not exist!";
+            }
+            
+            // --- LOGIC / CALCULATION PHASE ---
+            const currentUserData = userDoc.data() as User;
+            const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
 
-        gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
-        gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
-        gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+            const gameStats = updatedUser.stats.games[gameName];
+            const overallStats = updatedUser.stats.overall;
 
-        Object.keys(newGameStats).forEach(key => {
-            if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
-                const statKey = key as keyof GameStats;
-                if (typeof (gameStats as any)[statKey] === 'number' && typeof (newGameStats as any)[statKey] === 'number') {
-                    (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
-                } else {
-                    (gameStats as any)[statKey] = newGameStats[statKey];
+            gameStats.gamesPlayed = (gameStats.gamesPlayed || 0) + 1;
+            gameStats.highScore = Math.max(gameStats.highScore || 0, newGameStats.highScore || 0);
+            gameStats.totalPlaytime = (gameStats.totalPlaytime || 0) + (newGameStats.totalPlaytime || 0);
+
+            Object.keys(newGameStats).forEach(key => {
+                if (!['highScore', 'totalPlaytime', 'gamesPlayed'].includes(key)) {
+                    const statKey = key as keyof GameStats;
+                    if (typeof (gameStats as any)[statKey] === 'number' && typeof (newGameStats as any)[statKey] === 'number') {
+                        (gameStats as any)[statKey] = ((gameStats as any)[statKey] || 0) + (newGameStats[statKey] || 0);
+                    } else {
+                        (gameStats as any)[statKey] = newGameStats[statKey];
+                    }
                 }
+            });
+
+            if (gameName === 'Quiz') {
+                const quizStats = gameStats as User['stats']['games']['Quiz'];
+                quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
             }
-        });
+            
+            let isWin = (newGameStats.highScore ?? 0) > 0;
+            overallStats.totalGames = (overallStats.totalGames || 0) + 1;
+            if (isWin) { overallStats.totalWins = (overallStats.totalWins || 0) + 1; }
+            overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
+            overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
 
-        if (gameName === 'Quiz') {
-            const quizStats = gameStats as User['stats']['games']['Quiz'];
-            quizStats.avgAccuracy = quizStats.totalQuestions > 0 ? Math.round((quizStats.totalCorrect / quizStats.totalQuestions) * 100) : 0;
-        }
-        
-        let isWin = (newGameStats.highScore ?? 0) > 0;
-        overallStats.totalGames = (overallStats.totalGames || 0) + 1;
-        if (isWin) { overallStats.totalWins = (overallStats.totalWins || 0) + 1; }
-        overallStats.winRate = overallStats.totalGames > 0 ? Math.round((overallStats.totalWins / overallStats.totalGames) * 100) : 0;
-        overallStats.totalPlaytime = Object.values(updatedUser.stats.games).reduce((acc, g) => acc + (g.totalPlaytime || 0), 0);
+            const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
+            overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
+            
+            // --- WRITE PHASE ---
+            transaction.update(userDocRef, { stats: updatedUser.stats });
 
-        const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
-        overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
-        
-        transaction.update(userDocRef, { stats: updatedUser.stats });
-        setUser(updatedUser);
-
-        const leaderboardDoc = await transaction.get(leaderboardDocRef);
-        if (leaderboardDoc.exists()) {
-            const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
-            const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
-            if (userIndex > -1) {
-                leaderboardUsers[userIndex].stats = updatedUser.stats;
-                transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+            if (leaderboardDoc.exists()) {
+                const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
+                const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
+                if (userIndex > -1) {
+                    leaderboardUsers[userIndex].stats = updatedUser.stats;
+                    transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+                } else {
+                     transaction.update(leaderboardDocRef, { users: [...leaderboardUsers, { id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
+                }
             } else {
-                 transaction.update(leaderboardDocRef, { users: [...leaderboardUsers, { id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
+                transaction.set(leaderboardDocRef, { users: [{ id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
             }
-        } else {
-            transaction.set(leaderboardDocRef, { users: [{ id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
-        }
-      });
+            
+            // Update local state after successful transaction
+            setUser(updatedUser);
+        });
     } catch (e) {
         handleError(e, "Failed to update game stats.");
         throw e;
     }
-  }, [user, db, handleError]);
+}, [user, db]);
   
-  const resetStats = async () => {
+const resetStats = async () => {
     if (!user || !db) return;
     const userDocRef = doc(db, 'users', user.id);
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
     const newStats = JSON.parse(JSON.stringify(defaultStats));
     
     try {
-      await runTransaction(db, async (transaction) => {
-          transaction.update(userDocRef, { stats: newStats });
-          
-          const leaderboardDoc = await transaction.get(leaderboardDocRef);
-          if (leaderboardDoc.exists()) {
-              const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
-              const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
-              if (userIndex > -1) {
-                  leaderboardUsers[userIndex].stats = newStats;
-                  transaction.update(leaderboardDocRef, { users: leaderboardUsers });
-              }
-          }
-      });
-      setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
+        await runTransaction(db, async (transaction) => {
+            // --- READ PHASE ---
+            const leaderboardDoc = await transaction.get(leaderboardDocRef);
+            
+            // --- WRITE PHASE ---
+            transaction.update(userDocRef, { stats: newStats });
+            
+            if (leaderboardDoc.exists()) {
+                const leaderboardUsers = leaderboardDoc.data().users as LeaderboardUser[];
+                const userIndex = leaderboardUsers.findIndex(u => u.id === user.id);
+                if (userIndex > -1) {
+                    leaderboardUsers[userIndex].stats = newStats;
+                    transaction.update(leaderboardDocRef, { users: leaderboardUsers });
+                }
+            }
+        });
+        setUser(currentUser => currentUser ? { ...currentUser, stats: newStats } : null);
     } catch (e) {
         handleError(e, "Failed to reset stats.");
         throw e;
     }
-  };
+};
   
   const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'date' | 'userId'>) => {
     if (!user || !db) throw new Error("User not logged in or Firebase not initialized.");
