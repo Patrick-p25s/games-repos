@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -46,9 +45,9 @@ export default function LeaderboardPage() {
   const leaderboardData: GameLeaderboard[] = useMemo(() => {
     return GAME_KEYS.map(gameKey => {
       const players = allUsers
-        .filter(user => user.stats?.games?.[gameKey] && user.stats.games[gameKey].highScore > 0)
+        .filter(user => user?.stats?.games?.[gameKey]?.highScore > 0)
         .sort((a, b) => (b.stats?.games?.[gameKey]?.highScore ?? 0) - (a.stats?.games?.[gameKey]?.highScore ?? 0))
-        .slice(0, 10) // Afficher le Top 10 au lieu du Top 3
+        .slice(0, 10)
         .map((user, index) => ({
           rank: index + 1,
           player: user.name,
