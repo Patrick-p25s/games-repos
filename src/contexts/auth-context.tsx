@@ -285,20 +285,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
     try {
-        await runTransaction(db, async (transaction) => {
-            const leaderboardDoc = await transaction.get(leaderboardDocRef);
-            
-            transaction.set(userDocRef, newUser);
+        const batch = writeBatch(db);
+        batch.set(userDocRef, newUser);
 
-            const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
+        const leaderboardDoc = await getDoc(leaderboardDocRef);
+        const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
 
-            if (!leaderboardDoc.exists()) {
-                transaction.set(leaderboardDocRef, { users: [newLeaderboardUser] });
-            } else {
-                const currentUsers = leaderboardDoc.data().users || [];
-                transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
-            }
-        });
+        if (!leaderboardDoc.exists()) {
+            batch.set(leaderboardDocRef, { users: [newLeaderboardUser] });
+        } else {
+            const currentUsers = leaderboardDoc.data().users || [];
+            batch.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
+        }
+        await batch.commit();
 
     } catch (e) {
         handleError(e, "Signup failed during database setup.");
@@ -308,7 +307,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Explicitly wait for user data to be fetched and set in state
+    await fetchUserData(userCredential.user);
   };
 
   const logout = async () => {
@@ -324,10 +325,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await runTransaction(db, async (transaction) => {
-        // --- READ PHASE ---
         const leaderboardDoc = await transaction.get(leaderboardDocRef);
         
-        // --- WRITE PHASE ---
         transaction.update(userDocRef, newDetails);
         
         if (newDetails.name && leaderboardDoc.exists()) {
@@ -342,6 +341,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser => currentUser ? { ...currentUser, ...newDetails } : null);
     } catch(e) {
       handleError(e, "Failed to update profile.");
+      throw e;
     }
   };
   
@@ -352,7 +352,6 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
 
     try {
         await runTransaction(db, async (transaction) => {
-            // --- READ PHASE ---
             const userDoc = await transaction.get(userDocRef);
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
 
@@ -360,7 +359,6 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
                 throw "Document does not exist!";
             }
             
-            // --- LOGIC / CALCULATION PHASE ---
             const currentUserData = userDoc.data() as User;
             const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
 
@@ -396,7 +394,6 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
             const favorite = Object.entries(updatedUser.stats.games).sort(([, a], [, b]) => (b.totalPlaytime || 0) - (a.totalPlaytime || 0))[0];
             overallStats.favoriteGame = favorite ? favorite[0] : 'N/A';
             
-            // --- WRITE PHASE ---
             transaction.update(userDocRef, { stats: updatedUser.stats });
 
             if (leaderboardDoc.exists()) {
@@ -412,7 +409,6 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
                 transaction.set(leaderboardDocRef, { users: [{ id: updatedUser.id, name: updatedUser.name, stats: updatedUser.stats }] });
             }
             
-            // Update local state after successful transaction
             setUser(updatedUser);
         });
     } catch (e) {
@@ -429,10 +425,8 @@ const resetStats = async () => {
     
     try {
         await runTransaction(db, async (transaction) => {
-            // --- READ PHASE ---
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
             
-            // --- WRITE PHASE ---
             transaction.update(userDocRef, { stats: newStats });
             
             if (leaderboardDoc.exists()) {
@@ -518,6 +512,7 @@ const resetStats = async () => {
       setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
     } catch(e) {
       handleError(e, "Failed to delete message.");
+      throw e;
     }
   };
   
@@ -530,6 +525,7 @@ const resetStats = async () => {
       setUser(currentUser => currentUser ? { ...currentUser, inbox: updatedInbox } : null);
     } catch(e) {
       handleError(e, "Failed to mark message as read.");
+      throw e;
     }
   }
 
