@@ -1,3 +1,4 @@
+
 /** @type {import('next').NextConfig} */
 // Fichier de configuration pour Next.js.
 // Il vous permet de personnaliser le comportement de votre application Next.js.
@@ -36,6 +37,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       }
+    ],
+  },
+  experimental: {
+    // Autorise l'origine du Cloud Workstation pour éviter les avertissements CORS en développement.
+    allowedDevOrigins: [
+        "https://9000-firebase-studio-1764556364571.cluster-fbfjltn375c6wqxlhoehbz44sk.cloudworkstations.dev"
     ],
   },
 };
