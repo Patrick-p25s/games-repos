@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -18,9 +17,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useLocale } from "@/contexts/locale-context";
-import { useAuth } from "@/contexts/auth-context";
 import { useMemo } from "react";
 import type { LeaderboardUser } from "@/contexts/auth-context";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 type Player = {
   rank: number;
@@ -40,25 +41,23 @@ const GAME_KEYS: GameKey[] = ["Quiz", "Tetris", "Snake", "Flippy Bird", "Memory"
 
 export default function LeaderboardPage() {
   const { t } = useLocale();
-  const { leaderboardData: allUsers } = useAuth();
+  const db = useFirestore();
+  const leaderboardDocRef = useMemoFirebase(() => doc(db, 'leaderboards', 'all'), [db]);
+  const { data: leaderboardDoc, isLoading } = useDoc<{ users: LeaderboardUser[] }>(leaderboardDocRef);
+  
+  const allUsers = leaderboardDoc?.users || [];
 
   const leaderboardData: GameLeaderboard[] = useMemo(() => {
     return GAME_KEYS.map(gameKey => {
-      // 1. Map users to a player object with a score, filtering out those with no score or score of 0
       const playersWithScores = allUsers
-        .map(user => {
-          const score = user?.stats?.games?.[gameKey]?.highScore ?? 0;
-          return {
-            name: user?.name,
-            score: score,
-          };
-        })
+        .map(user => ({
+          name: user?.name,
+          score: user?.stats?.games?.[gameKey]?.highScore ?? 0,
+        }))
         .filter(player => player.name && player.score > 0);
 
-      // 2. Sort the valid players by score in descending order
       const sortedPlayers = playersWithScores.sort((a, b) => b.score - a.score);
       
-      // 3. Take the top 10 and map them to the final Player format with a rank
       const topPlayers = sortedPlayers.slice(0, 10).map((player, index) => ({
         rank: index + 1,
         player: player.name!,
@@ -71,9 +70,16 @@ export default function LeaderboardPage() {
       };
     });
   }, [allUsers]);
-
+  
   const defaultTab = leaderboardData.find(board => board.players.length > 0)?.game || (leaderboardData.length > 0 ? leaderboardData[0].game : "");
 
+  if (isLoading) {
+    return (
+      <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-12">

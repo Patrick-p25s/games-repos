@@ -17,10 +17,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useLocale } from "@/contexts/locale-context";
-import { useAuth } from "@/contexts/auth-context";
 import { useMemo } from "react";
-import type { User } from "@/contexts/auth-context";
-
+import type { LeaderboardUser } from "@/contexts/auth-context";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 type Player = {
   rank: number;
@@ -33,36 +34,52 @@ type GameLeaderboard = {
   players: Player[];
 };
 
-type GameKey = keyof User['stats']['games'];
+type GameKey = keyof LeaderboardUser['stats']['games'];
 
 const GAME_KEYS: GameKey[] = ["Quiz", "Tetris", "Snake", "Flippy Bird", "Memory", "Puzzle"];
 
 
 export default function LeaderboardPage() {
   const { t } = useLocale();
-  const { allUsers } = useAuth();
+  const db = useFirestore();
+  const leaderboardDocRef = useMemoFirebase(() => doc(db, 'leaderboards', 'all'), [db]);
+  const { data: leaderboardDoc, isLoading } = useDoc<{ users: LeaderboardUser[] }>(leaderboardDocRef);
+  
+  const allUsers = leaderboardDoc?.users || [];
 
   const leaderboardData: GameLeaderboard[] = useMemo(() => {
     return GAME_KEYS.map(gameKey => {
-      const players = allUsers
-        .filter(user => user.stats?.games?.[gameKey] && user.stats.games[gameKey].highScore > 0)
-        .sort((a, b) => (b.stats?.games?.[gameKey]?.highScore ?? 0) - (a.stats?.games?.[gameKey]?.highScore ?? 0))
-        .slice(0, 10) // Show top 10 instead of top 3
-        .map((user, index) => ({
-          rank: index + 1,
-          player: user.name,
-          score: user.stats.games[gameKey].highScore,
-        }));
+      const playersWithScores = allUsers
+        .map(user => ({
+          name: user?.name,
+          score: user?.stats?.games?.[gameKey]?.highScore ?? 0,
+        }))
+        .filter(player => player.name && player.score > 0);
+
+      const sortedPlayers = playersWithScores.sort((a, b) => b.score - a.score);
+      
+      const topPlayers = sortedPlayers.slice(0, 10).map((player, index) => ({
+        rank: index + 1,
+        player: player.name!,
+        score: player.score,
+      }));
 
       return {
         game: gameKey,
-        players: players,
+        players: topPlayers,
       };
     });
   }, [allUsers]);
-
+  
   const defaultTab = leaderboardData.find(board => board.players.length > 0)?.game || (leaderboardData.length > 0 ? leaderboardData[0].game : "");
 
+  if (isLoading) {
+    return (
+      <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-12">
