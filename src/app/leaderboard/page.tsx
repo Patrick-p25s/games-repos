@@ -42,7 +42,7 @@ const GAME_KEYS: GameKey[] = ["Quiz", "Tetris", "Snake", "Flippy Bird", "Memory"
 export default function LeaderboardPage() {
   const { t } = useLocale();
   const db = useFirestore();
-  const leaderboardDocRef = useMemoFirebase(() => doc(db, 'leaderboards', 'all'), [db]);
+  const leaderboardDocRef = useMemoFirebase(() => db ? doc(db, 'leaderboards', 'all') : null, [db]);
   const { data: leaderboardDoc, isLoading } = useDoc<{ users: LeaderboardUser[] }>(leaderboardDocRef);
   
   const allUsers = leaderboardDoc?.users || [];
