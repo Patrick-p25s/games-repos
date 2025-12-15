@@ -20,7 +20,7 @@ service cloud.firestore {
     // Function to check if the user is updating only the allowed fields
     function isUpdatingOwnSafeFields() {
       // The keys that are allowed to be updated by the user.
-      let allowedUpdateKeys = ['name', 'avatar', 'stats'];
+      let allowedUpdateKeys = ['name', 'avatar', 'stats', 'inbox'];
       
       // The keys present in the incoming request data.
       let requestKeys = request.resource.data.keys();

@@ -13,6 +13,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, getDocs, deleteDoc, runTran
 import { useRouter } from 'next/navigation';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { FirebaseError } from 'firebase/app';
 
 // Définit la structure des statistiques pour chaque jeu.
 type GameStats = {
@@ -203,19 +204,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             return userData;
         } else {
-            const name = firebaseUser.displayName || email.split('@')[0] || "New Player";
-            const newUser: User = {
-                id: firebaseUser.uid,
-                name,
-                email,
-                avatar: `https://picsum.photos/seed/${firebaseUser.uid}/96/96`,
-                role: isAdminUser ? 'admin' : 'user',
-                stats: JSON.parse(JSON.stringify(defaultStats)),
-                inbox: [],
-            };
-            await setDoc(userDocRef, newUser);
-            setUser(newUser);
-            return newUser;
+            // This case should ideally be handled only during signup
+            // to avoid creating docs for users who failed to sign up properly.
+            // However, it acts as a good fallback.
+            return null;
         }
     } catch (e) {
         handleError(e, "Failed to fetch user data.");
@@ -286,14 +278,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const leaderboardDocRef = doc(db, 'leaderboards', 'all');
 
     try {
-        const batch = writeBatch(db);
-        batch.set(userDocRef, newUser);
+        await runTransaction(db, async (transaction) => {
+            const leaderboardDoc = await transaction.get(leaderboardDocRef);
+            
+            transaction.set(userDocRef, newUser);
+            
+            const newLeaderboardEntry = { id: newUser.id, name: newUser.name, stats: newUser.stats };
 
-        // We will read the leaderboard doc inside a transaction if needed, but for signup, optimistic update is fine.
-        // For simplicity and to avoid read-after-write, let's handle this in updateUserStats.
-        // For a new user, we just create their doc. The leaderboard can be populated on first stat update.
-        await batch.commit();
-
+            if (leaderboardDoc.exists()) {
+                const currentUsers = leaderboardDoc.data().users as LeaderboardUser[];
+                transaction.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardEntry] });
+            } else {
+                transaction.set(leaderboardDocRef, { users: [newLeaderboardEntry] });
+            }
+        });
+        setUser(newUser);
     } catch (e) {
         handleError(e, "Signup failed during database setup.");
         throw e;
@@ -303,7 +302,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged will handle fetching user data. We just await the sign-in.
     await fetchUserData(userCredential.user);
   };
 
@@ -321,8 +319,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await runTransaction(db, async (transaction) => {
+        // --- READ PHASE ---
         const leaderboardDoc = await transaction.get(leaderboardDocRef);
         
+        // --- WRITE PHASE ---
         transaction.update(userDocRef, newDetails);
         
         if (newDetails.name && leaderboardDoc.exists()) {
@@ -348,6 +348,7 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
 
     try {
         await runTransaction(db, async (transaction) => {
+            // --- READ PHASE ---
             const userDoc = await transaction.get(userDocRef);
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
 
@@ -355,6 +356,7 @@ const updateUserStats = useCallback(async (gameName: keyof User['stats']['games'
                 throw "Document does not exist!";
             }
             
+            // --- CALCULATE AND WRITE PHASE ---
             const currentUserData = userDoc.data() as User;
             const updatedUser: User = JSON.parse(JSON.stringify(currentUserData));
 
@@ -421,10 +423,15 @@ const resetStats = async () => {
     
     try {
         await runTransaction(db, async (transaction) => {
-            // Phase 1: Reads
+            // --- READ PHASE ---
+            const userDoc = await transaction.get(userDocRef);
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
             
-            // Phase 2: Writes
+            if (!userDoc.exists()) {
+              throw "User document not found!";
+            }
+
+            // --- WRITE PHASE ---
             transaction.update(userDocRef, { stats: newStats });
             
             if (leaderboardDoc.exists()) {
@@ -471,8 +478,7 @@ const resetStats = async () => {
   const sendReply = async (userId: string, subject: string, message: string, originalFeedbackId: string) => {
     if (!db || !isAdmin) return;
     const userDocRef = doc(db, "users", userId);
-    const feedbackDocRef = doc(db, "feedback", originalFeedbackId);
-
+    
     try {
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
@@ -491,11 +497,7 @@ const resetStats = async () => {
 
             const newInbox = [newInboxMessage, ...(userData.inbox || [])];
             transaction.update(userDocRef, { inbox: newInbox });
-            transaction.delete(feedbackDocRef);
         });
-
-        setAllFeedback(current => current.filter(f => f.id !== originalFeedbackId));
-
     } catch (e) {
         handleError(e, "Failed to send reply.");
     }
