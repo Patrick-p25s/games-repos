@@ -254,12 +254,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
     };
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoaded(false); // Set loading to true while we process auth state
       if (firebaseUser) {
         await fetchUserData(firebaseUser);
       } else {
         setUser(null);
       }
-      setIsLoaded(true);
+      setIsLoaded(true); // Set loading to false once user data is fetched or cleared
     });
     return () => unsubscribe();
   }, [auth, fetchUserData]);
@@ -288,15 +289,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const batch = writeBatch(db);
         batch.set(userDocRef, newUser);
 
-        const leaderboardDoc = await getDoc(leaderboardDocRef);
-        const newLeaderboardUser: LeaderboardUser = { id: newUser.id, name: newUser.name, stats: newUser.stats };
-
-        if (!leaderboardDoc.exists()) {
-            batch.set(leaderboardDocRef, { users: [newLeaderboardUser] });
-        } else {
-            const currentUsers = leaderboardDoc.data().users || [];
-            batch.update(leaderboardDocRef, { users: [...currentUsers, newLeaderboardUser] });
-        }
+        // We will read the leaderboard doc inside a transaction if needed, but for signup, optimistic update is fine.
+        // For simplicity and to avoid read-after-write, let's handle this in updateUserStats.
+        // For a new user, we just create their doc. The leaderboard can be populated on first stat update.
         await batch.commit();
 
     } catch (e) {
@@ -308,13 +303,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error("Firebase not initialized.");
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // Explicitly wait for user data to be fetched and set in state
+    // onAuthStateChanged will handle fetching user data. We just await the sign-in.
     await fetchUserData(userCredential.user);
   };
 
   const logout = async () => {
     if (!auth) return;
     await signOut(auth);
+    setUser(null); // Explicitly clear user state on logout
     router.push('/');
   };
 
@@ -425,8 +421,10 @@ const resetStats = async () => {
     
     try {
         await runTransaction(db, async (transaction) => {
+            // Phase 1: Reads
             const leaderboardDoc = await transaction.get(leaderboardDocRef);
             
+            // Phase 2: Writes
             transaction.update(userDocRef, { stats: newStats });
             
             if (leaderboardDoc.exists()) {

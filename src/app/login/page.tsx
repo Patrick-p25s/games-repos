@@ -111,8 +111,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                {t('login')}
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? t('login') + "..." : t('login')}
               </Button>
             </form>
           </Form>

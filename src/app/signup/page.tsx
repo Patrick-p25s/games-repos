@@ -117,8 +117,8 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                {t('createAccount')}
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? t('createAccount') + "..." : t('createAccount')}
               </Button>
             </form>
           </Form>

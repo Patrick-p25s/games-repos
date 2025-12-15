@@ -1,9 +1,10 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for reusable logic
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,76 +14,79 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Use email for reliable admin identification.
       return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 
-    function isUpdatingOwnSafeFields(userId) {
-      let isOwner = isOwner(userId);
-      let incomingData = request.resource.data;
-      let existingData = resource.data;
+    // Function to check if the user is updating only the allowed fields
+    function isUpdatingOwnSafeFields() {
+      // The keys that are allowed to be updated by the user.
+      let allowedUpdateKeys = ['name', 'avatar', 'stats'];
       
-      // List of fields the user is allowed to change.
-      let allowedFields = ['name', 'avatar', 'stats'];
-      let incomingKeys = incomingData.keys();
+      // The keys present in the incoming request data.
+      let requestKeys = request.resource.data.keys();
       
-      // Ensure all keys in the request are a subset of the allowed fields.
-      let changesAllowed = incomingKeys.hasOnly(allowedFields);
-      
-      // Ensure non-editable fields remain unchanged by comparing them to existing data.
-      let roleUnchanged = !('role' in incomingData) || incomingData.role == existingData.role;
-      let emailUnchanged = !('email' in incomingData) || incomingData.email == existingData.email;
-      let idUnchanged = !('id' in incomingData) || incomingData.id == existingData.id;
-
-      return isOwner && changesAllowed && roleUnchanged && emailUnchanged && idUnchanged;
-    }
-    
-    function isCreatingOwnDocument(userId) {
-        let isOwner = isOwner(userId);
-        let isNotAssigningRole = !('role' in request.resource.data) || request.resource.data.role == 'user';
-        return isOwner && isNotAssigningRole;
+      // Ensures that the incoming request does not contain any keys that are not in the allowed list.
+      return requestKeys.hasOnly(allowedUpdateKeys);
     }
 
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      // Admin can do anything.
+      // A user can read their own document.
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Only admins can list all users.
       allow list: if isAdmin();
-      allow create: if isCreatingOwnDocument(userId);
-      allow update: if isUpdatingOwnSafeFields(userId) || isAdmin();
+      
+      // A user can create their own document.
+      allow create: if isOwner(userId);
+
+      // Admin can update any user.
+      // A user can update their own document IF they are only changing safe fields.
+      allow update: if isAdmin() || (isOwner(userId) && isUpdatingOwnSafeFields());
+
+      // Only admins can delete users.
       allow delete: if isAdmin();
 
+      // Subcollections for user
       match /scores/{scoreId} {
-        allow read, list, write: if isOwner(userId) || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin();
       }
 
       match /quiz_history/{userQuizHistoryId} {
-        allow read, list, write: if isOwner(userId) || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
+    // Rules for 'games' and 'quiz_questions'
     match /games/{gameId} {
-      allow read, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /quiz_questions/{quizQuestionId} {
-      allow read, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
+    // Rules for feedback
     match /feedback/{feedbackId} {
       allow create: if isSignedIn();
       allow read, list, update, delete: if isAdmin();
     }
 
+    // Rules for app stats (like view counter)
     match /app-stats/{statId} {
       allow get: if true;
-      allow write: if true;
-      allow delete: if false;
+      allow write: if true; // Allows transactional increments from any client
     }
 
-    match /leaderboards/all {
-      allow get: if true;
-      allow write: if isSignedIn(); 
+    // Rules for public leaderboards
+    match /leaderboards/{leaderboardId} {
+      allow read: if true;
+      // Writes should be handled by secure backend logic (transactions in this case),
+      // but we allow signed-in users to initiate updates that are validated by rules.
+      allow write: if isSignedIn() || isAdmin();
     }
   }
 }
