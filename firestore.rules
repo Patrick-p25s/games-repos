@@ -17,18 +17,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'admin@nextgen.games';
     }
 
-    // Function to check if the user is updating only the allowed fields
-    function isUpdatingOwnSafeFields() {
-      // The keys that are allowed to be updated by the user.
-      let allowedUpdateKeys = ['name', 'avatar', 'stats', 'inbox'];
-      
-      // The keys present in the incoming request data.
-      let requestKeys = request.resource.data.keys();
-      
-      // Ensures that the incoming request does not contain any keys that are not in the allowed list.
-      return requestKeys.hasOnly(allowedUpdateKeys);
-    }
-
     // Rules for the 'users' collection
     match /users/{userId} {
       // Admin can do anything.
@@ -42,8 +30,12 @@ service cloud.firestore {
       allow create: if isOwner(userId);
 
       // Admin can update any user.
-      // A user can update their own document IF they are only changing safe fields.
-      allow update: if isAdmin() || (isOwner(userId) && isUpdatingOwnSafeFields());
+      // A user can update their own document IF they are only changing safe fields
+      // and not changing their role or email.
+      allow update: if isAdmin() || (isOwner(userId)
+        && request.resource.data.keys().hasOnly(['name', 'avatar', 'stats', 'inbox', 'id', 'email', 'role'])
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role);
 
       // Only admins can delete users.
       allow delete: if isAdmin();
@@ -84,8 +76,8 @@ service cloud.firestore {
     // Rules for public leaderboards
     match /leaderboards/{leaderboardId} {
       allow read: if true;
-      // Writes should be handled by secure backend logic (transactions in this case),
-      // but we allow signed-in users to initiate updates that are validated by rules.
+      // Writes are handled by secure backend logic (transactions), but we need to allow
+      // authenticated users to trigger updates validated by rules.
       allow write: if isSignedIn() || isAdmin();
     }
   }
